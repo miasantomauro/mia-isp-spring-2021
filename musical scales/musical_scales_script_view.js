@@ -119,8 +119,9 @@ function playScale(notes) {
 */
 
 const bottom = 400;
-const left = 50;
+const left = 100;
 const w = 25;
+const margin = 20;
 
 function constructOrderedIntervals(intervals, orderedIntervals) {
 
@@ -181,42 +182,28 @@ function noteToY(note) {
   
 }
 
-function drawNotesOLD(orderedIntervals) {
-  const x = (interval, index) => {
-    return index * w + left + 20;
-  }
-
-  const y = (interval, index, array) => {
-    let cumulative = 0;
-    let i;
-    for (i = 0; i <= index; i++) {
-      let x = parseInt(orderedIntervals[i].hs._id);
-      cumulative += x;
-    }
-    return bottom - (cumulative * 15) + (w / 2);
-  }
-
-  d3.select(svg)
-  .selectAll('circle')
-  .data(orderedIntervals)
-  .join('circle')
-  .attr('r', w / 2)
-  .attr('cx', x)
-  .attr('cy', y)
-  .style('stroke', 'black')
-  .style('fill', 'white');
-}
-
 function drawNotes(notes) {
   const x = (note, index) => {
-    return index * w + left + 20;
+    return index * (w + margin) + left + 20; // todo replace 20 with width of treble clef
   }
 
   const y = (note, index) => {
     return noteToY(note);
   }
 
-  d3.select(svg)
+  const c = (note) => {
+    if (note.length === 3) {
+      const accidental = note[1];
+      if (accidental === "#") {
+        return "#EB4141"
+      } else if (accidental === "b") {
+        return "#4199EB"
+      }
+    }
+    return "#FFFFFF"
+  }
+
+  const circles = d3.select(svg)
   .selectAll('circle')
   .data(notes)
   .join('circle')
@@ -224,7 +211,7 @@ function drawNotes(notes) {
   .attr('cx', x)
   .attr('cy', noteToY)
   .style('stroke', 'black')
-  .style('fill', 'white');
+  .style('fill', c);
 }
 
 function constructVisualization(notes) {
