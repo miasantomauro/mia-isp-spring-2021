@@ -5,8 +5,20 @@ console.log(halfStep("B3") === "C4");
 console.log(halfStep("E3") === "F3");
 console.log(halfStep("F3") === "F#3");
 console.log(halfStep("C4") === "C#4");
+console.log(halfStep("B#3") === "C#4");
 
 // whole step
 console.log(wholeStep("C4") === "D4");
 console.log(wholeStep("B4") === "C#5");
 console.log(wholeStep("D#3") === "F3");
+
+// getValidKey
+
+console.log(getNoteEquiv("C4") === "C4");
+console.log(getNoteEquiv("C#4") === "Db4");
+console.log(getNoteEquiv("B#3") === "C4");
+console.log(getNoteEquiv("Eb5") === "D#5");
+console.log(getNoteEquiv("E#3") === "F3");
+
+console.log(getValidKey("C4") === "C4");
+console.log(getValidKey("Cb4") === "B3");
