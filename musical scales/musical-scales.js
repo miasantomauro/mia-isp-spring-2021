@@ -6,17 +6,17 @@ const synth = new tone.Synth().toDestination();
 const lowestNote = "C4";
 
 /*
-  __  __ _   _ ___ ___ ___   ___ _   _ _  _  ___ _____ ___ ___  _  _ ___ 
+  __  __ _   _ ___ ___ ___   ___ _   _ _  _  ___ _____ ___ ___  _  _ ___
  |  \/  | | | / __|_ _/ __| | __| | | | \| |/ __|_   _|_ _/ _ \| \| / __|
  | |\/| | |_| \__ \| | (__  | _|| |_| | .` | (__  | |  | | (_) | .` \__ \
  |_|  |_|\___/|___/___\___| |_|  \___/|_|\_|\___| |_| |___\___/|_|\_|___/
-                                                                        
+
 */
 
 /**
- * a function to get the next letter alphabetically after the given letter, 
+ * a function to get the next letter alphabetically after the given letter,
  * wrapping around back to A after G
- * @param {*} letter 
+ * @param {*} letter
  */
 function nextLetter(letter) {
   if (letter === "G") {
@@ -28,7 +28,7 @@ function nextLetter(letter) {
 
 /**
  * a function to get the note a half-step up from the given note
- * @param {*} note 
+ * @param {*} note
  */
 function halfStep(note) {
   // if the note does not contain any accidentals...
@@ -63,19 +63,19 @@ function halfStep(note) {
 }
 
 /**
- * a function to get the note a whole step up from the given note 
- * @param {*} note 
+ * a function to get the note a whole step up from the given note
+ * @param {*} note
  */
 function wholeStep(note) {
   return halfStep(halfStep(note))
 }
 
 /*
-  ___  ___  _   _ _  _ ___    ___ _   _ _  _  ___ _____ ___ ___  _  _ ___ 
+  ___  ___  _   _ _  _ ___    ___ _   _ _  _  ___ _____ ___ ___  _  _ ___
  / __|/ _ \| | | | \| |   \  | __| | | | \| |/ __|_   _|_ _/ _ \| \| / __|
  \__ \ (_) | |_| | .` | |) | | _|| |_| | .` | (__  | |  | | (_) | .` \__ \
  |___/\___/ \___/|_|\_|___/  |_|  \___/|_|\_|\___| |_| |___\___/|_|\_|___/
-                                                                          
+
 */
 
 function getNotesFromIntervals(intervals, startNote, notes) {
@@ -111,17 +111,17 @@ function playScale(notes) {
 }
 
 /*
- __   _____ ____  ___ _   _ _  _  ___ _____ ___ ___  _  _ ___ 
+ __   _____ ____  ___ _   _ _  _  ___ _____ ___ ___  _  _ ___
  \ \ / /_ _|_  / | __| | | | \| |/ __|_   _|_ _/ _ \| \| / __|
   \ V / | | / /  | _|| |_| | .` | (__  | |  | | (_) | .` \__ \
    \_/ |___/___| |_|  \___/|_|\_|\___| |_| |___\___/|_|\_|___/
-                                                              
+
 */
 
 const bottom = 400;
 const left = 100;
 const w = 25;
-const margin = 20;
+const margin = 30;
 
 function constructOrderedIntervals(intervals, orderedIntervals) {
 
@@ -139,7 +139,7 @@ function constructOrderedIntervals(intervals, orderedIntervals) {
 function drawStaff() {
   let i;
   for (i = 0; i < 5; i++) {
-    let y = bottom - (i * w) - w; // hardcoding offset from e to c
+    let y = bottom - (i * w) - w;
     d3.select(svg)
        .append("line")
        .attr("x1", left)
@@ -165,13 +165,13 @@ function noteToY(note) {
     octave = note[2];
 
   }
-  
+
   const lowestOctave = parseInt(lowestNote[1]);
   offset += (7 * (octave - lowestOctave));
-  
+
   const letterCharCode = letter.charCodeAt(0);
   const lowestCharCode = lowestNote.charCodeAt(0);
-  
+
   if (letterCharCode > lowestCharCode) {
     offset += letterCharCode - lowestCharCode;
   } else if (letterCharCode < lowestCharCode) {
@@ -179,7 +179,7 @@ function noteToY(note) {
   }
 
   return bottom - (w * (offset / 2))
-  
+
 }
 
 function drawNotes(notes) {
@@ -191,27 +191,45 @@ function drawNotes(notes) {
     return noteToY(note);
   }
 
-  const c = (note) => {
+  const accX = (note, index) => {
+	  return x(note, index) - 36;
+  }
+
+  const accY = (note, index) => {
+	  return y(note, index) + 5;
+  }
+
+  const acc = (note) => {
     if (note.length === 3) {
       const accidental = note[1];
       if (accidental === "#") {
-        return "#EB4141"
+        return "#"
       } else if (accidental === "b") {
-        return "#4199EB"
+        return "♭"
       }
     }
-    return "#FFFFFF"
+    return ""
   }
 
   const circles = d3.select(svg)
-  .selectAll('circle')
+  .selectAll('ellipse')
   .data(notes)
-  .join('circle')
-  .attr('r', w / 2)
+  .join('ellipse')
+  .attr('rx', w / 2 + 5)
+  .attr('ry', w / 2)
   .attr('cx', x)
   .attr('cy', noteToY)
   .style('stroke', 'black')
-  .style('fill', c);
+  .style('fill', 'white');
+
+  const accidentals = d3.select(svg)
+  .selectAll('text')
+  .data(notes)
+  .join('text')
+  .attr('x', accX)
+  .attr('y', accY)
+  .style("font", "24px times")
+  .text(acc);
 }
 
 function constructVisualization(notes) {
