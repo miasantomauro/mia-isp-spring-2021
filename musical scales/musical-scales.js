@@ -118,7 +118,7 @@ function getMajorKeyIndex(intervals) {
       // either dorian, or aeolian
       if (isHalfStep(intervals[4])) {
         return 2; // aeolian
-      } else { 
+      } else {
         return 6; // dorian
       }
     } else {
@@ -140,7 +140,7 @@ function getMajorKeyIndex(intervals) {
 
 /**
  * given a sequence of intervals, determines the index of the note which represents the corresponding minor key
- * @param {*} intervals 
+ * @param {*} intervals
  */
 function getMinorKeyIndex(intervals) {
   const maj = getMajorKeyIndex(intervals);
@@ -153,7 +153,7 @@ function getNoteEquiv(note) {
     const letter = note[0];
     const accidental = note[1];
     const octave = note[2];
-    if (accidental === "#") { 
+    if (accidental === "#") {
       if (letter === "E") {
         return "F" + octave;
       } else if (letter === "B") {
@@ -179,7 +179,7 @@ function getNoteEquiv(note) {
 
 /**
  * a function to remove the octave from the given note
- * @param {} note 
+ * @param {} note
  */
 function truncNote(note) {
   let truncatedNote;
@@ -193,11 +193,11 @@ function truncNote(note) {
 
 /**
  * given an arbitrary key, return an equivalent one that is one the circe of fifths
- * @param {*} key 
+ * @param {*} key
  */
 function getValidKey(key) {
   const truncatedKey = truncNote(key);
-  
+
   if (VALID_KEYS.includes(truncatedKey)) {
     return key;
   } else {
@@ -405,9 +405,26 @@ function drawNotes(notes) {
   .text(acc);
 }
 
-function constructVisualization(notes) {
+function printResult(notes, majIndex, majKey) {
+	d3.select(svg)
+    .append("text")
+    .style("fill", "black")
+    .attr("x", 50)
+    .attr("y", 50)
+    .text("This is " + truncNote(notes[0]) + " " + modes[majIndex]);
+
+  d3.select(svg)
+    .append("text")
+    .style("fill", "black")
+    .attr("x", 50)
+    .attr("y", 70)
+    .text("which is in the key of " + truncNote(majKey) + " Major");
+}
+
+function constructVisualization(notes, majIndex, majKey) {
   drawStaff();
-  drawNotes(notes)
+  drawNotes(notes);
+  printResult(notes, majIndex, majKey);
 }
 
 /**
@@ -437,10 +454,7 @@ function go(startNote) {
   playScale(notes);
 
   // rendering the scale on the staff
-  constructVisualization(notes);
-
-  console.log("This is " + notes[0] + " " + modes[majIndex]);
-  console.log("which is in the key of " + truncNote(majKey) + " major");
+  constructVisualization(notes, majIndex, majKey);
 
 }
 
