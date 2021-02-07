@@ -15,11 +15,12 @@ const lowestNote = "C4";
 const SHARP_KEYS = ["G", "D", "A", "E", "B", "F#", "C#"];
 const FLAT_KEYS = ["Gb", "Db", "Ab", "Eb", "Bb", "F"];
 const VALID_KEYS = ["C"] + SHARP_KEYS + FLAT_KEYS;
+const MODES = ["ionian", "locrian", "aeolian", "mixolydian", "lydian", "phrygian", "dorian"];
 
 /**
  * a function to get the next letter alphabetically after the given letter,
  * wrapping around back to A after G
- * @param {*} letter
+ * @param {string} letter
  */
 function nextLetter(letter) {
   if (letter === "G") {
@@ -32,7 +33,7 @@ function nextLetter(letter) {
 /**
  * a function to get the next letter alphabetically after the given letter,
  * wrapping around back to G after A
- * @param {*} letter
+ * @param {string} letter
  */
 function previousLetter(letter) {
   if (letter === "A") {
@@ -44,7 +45,7 @@ function previousLetter(letter) {
 
 /**
  * a function to get the note a half-step up from the given note
- * @param {*} note
+ * @param {string} note
  */
 function halfStep(note) {
   // if the note does not contain any accidentals...
@@ -84,23 +85,49 @@ function halfStep(note) {
 
 /**
  * a function to get the note a whole step up from the given note
- * @param {*} note
+ * @param {string} note
  */
 function wholeStep(note) {
   return halfStep(halfStep(note))
 }
 
-// use the indexes from functions below tell you which mode you're in
-// for example, if the corresponding major key's tonic is the first note, you're in ionian
-// if the corresponding major key's tonic is the second note, you're in locrian
-const modes = ["ionian", "locrian", "aeolian", "mixolydian", "lydian", "phrygian", "dorian"];
-
+/**
+ * a function to determine if the given interval represents a half step
+ * @param {Interval from forge spec} interval 
+ */
 function isHalfStep(interval) {
   return interval.hs._id === "1";
 }
 
 /**
- * given a sequence of intervals, determines the index of the note which represents the corresponding major key
+ * a function to, given a starting note and a sequence of intervals, construct a scale
+ * @param {Interval[]} intervals 
+ * @param {string} startNote 
+ * @param {string[]} notes the array to populate with the resulting scale.
+ */
+function getNotesFromIntervals(intervals, startNote, notes) {
+
+  notes.push(startNote);
+
+  let currInterval;
+  let currNote = startNote;
+  let i;
+  for (i = 0; i < intervals.length; i++) {
+    currInterval = intervals[i];
+    // if the interval is a half-step...
+    if (isHalfStep(currInterval)) {
+      currNote = halfStep(currNote);   
+    } else { // if the interval is a whole-step...
+      currNote = wholeStep(currNote);
+    }
+    notes.push(currNote);
+  }
+}
+
+/**
+ * a function to, given a sequence of intervals, determine the index of the note which represents 
+ * the corresponding major key
+ * @param {Interval[]} intervals 
  */
 function getMajorKeyIndex(intervals) {
   // first interval is half step
@@ -133,14 +160,13 @@ function getMajorKeyIndex(intervals) {
       } else {
         return 4; //lydian
       }
-
     }
   }
 }
 
 /**
  * given a sequence of intervals, determines the index of the note which represents the corresponding minor key
- * @param {*} intervals
+ * @param {Interval[]} intervals
  */
 function getMinorKeyIndex(intervals) {
   const maj = getMajorKeyIndex(intervals);
@@ -178,8 +204,8 @@ function getNoteEquiv(note) {
 }
 
 /**
- * a function to remove the octave from the given note
- * @param {} note
+ * a function to remove the octave notation from the given note
+ * @param {string} note
  */
 function truncNote(note) {
   let truncatedNote;
@@ -193,7 +219,7 @@ function truncNote(note) {
 
 /**
  * given an arbitrary key, return an equivalent one that is one the circe of fifths
- * @param {*} key
+ * @param {string} key
  */
 function getValidKey(key) {
   const truncatedKey = truncNote(key);
@@ -205,11 +231,16 @@ function getValidKey(key) {
   }
 }
 
+/**
+ * a function to determine whether the given key uses sharps in its key signature
+ * @param {string} key 
+ */
 function keyUsesSharps(key) {
   const truncatedKey = truncNote(key);
   return SHARP_KEYS.includes(truncatedKey);
 }
 
+/*
 function keyUsesFlats(key) {
   let truncatedKey;
   if (key.length === 2) {
@@ -250,28 +281,6 @@ function fitNotesToKey(key, notesApprox, notes) {
  |___/\___/ \___/|_|\_|___/  |_|  \___/|_|\_|\___| |_| |___\___/|_|\_|___/
 
 */
-
-function getNotesFromIntervals(intervals, startNote, notes) {
-
-  notes.push(startNote);
-
-  let currInterval;
-  let currNote = startNote;
-  let i;
-  for (i = 0; i < intervals.length; i++) {
-    currInterval = intervals[i];
-    // if the interval is a half-step...
-    if (currInterval.hs._id === "1") {
-      currNote = halfStep(currNote);
-      notes.push(currNote);
-      // if the interval is a whole-step...
-    } else if (currInterval.hs._id === "2") {
-      currNote = wholeStep(currNote);
-      notes.push(currNote);
-    }
-  }
-}
-
 
 function playScale(notes) {
 
@@ -334,9 +343,7 @@ function noteToY(note) {
     octave = note[1];
   } else if (note.length === 3) {
     letter = note[0];
-    const accidental = note[1];
     octave = note[2];
-
   }
 
   const lowestOctave = parseInt(lowestNote[1]);
@@ -411,7 +418,7 @@ function printResult(notes, majIndex, majKey) {
     .style("fill", "black")
     .attr("x", 50)
     .attr("y", 50)
-    .text("This is " + truncNote(notes[0]) + " " + modes[majIndex]);
+    .text("This is " + truncNote(notes[0]) + " " + MODES[majIndex]);
 
   d3.select(svg)
     .append("text")

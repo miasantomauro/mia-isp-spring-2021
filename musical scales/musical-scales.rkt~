@@ -24,15 +24,12 @@ sig H extends Interval {}
 
 -- In Alloy, we'd say "one sig Start in Interval {}"
 one sig Start {
-  start: one Interval,
-  offset: one Int
+  start: one Interval
 }
 
 pred intervalSizes {
   all s: W | s.hs = sing[2]
   all s: H | s.hs = sing[1]
-  sum[Start.offset] >= 0
-  sum[Start.offset] < 12
 }
 
 pred intervalsPartitionOctave {
