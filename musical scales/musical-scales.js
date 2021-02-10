@@ -240,7 +240,7 @@ function keyUsesSharps(key) {
   return SHARP_KEYS.includes(truncatedKey);
 }
 
-/*
+
 function keyUsesFlats(key) {
   let truncatedKey;
   if (key.length === 2) {
@@ -271,6 +271,43 @@ function fitNotesToKey(key, notesApprox, notes) {
       }
     }
     notes.push(currNote);
+  }
+}
+
+function toSimpleIntervals(intervals, simpleIntervals) {
+  let i;
+  for (i = 0; i < intervals.length; i++) {
+    simpleIntervals.push(parseInt(intervals[i].hs._id));
+  }
+}
+
+function isChurchMode(intervals) {
+
+  const simpleIntervals = [];
+  toSimpleIntervals(intervals, simpleIntervals);
+
+  console.log("intervals: " + intervals);
+  console.log("intervals: " + simpleIntervals);
+  const firstHalfStep = simpleIntervals.indexOf(1);
+  console.log("first half step: " + firstHalfStep);
+
+  if (firstHalfStep < 0 || firstHalfStep > 3) {
+    return false;
+  }
+
+  const restOfIntervals = simpleIntervals.slice(firstHalfStep + 1);
+  const secondHalfStep = restOfIntervals.indexOf(1);
+
+  if (secondHalfStep < 0 || secondHalfStep > 3) {
+    return false;
+  }
+
+  if (secondHalfStep === 2) {
+    return [1, 2, 3].includes(firstHalfStep);
+  } else if (secondHalfStep === 3) {
+    return [0, 1, 2].includes(firstHalfStep);
+  } else {
+    return false;
   }
 }
 
@@ -412,26 +449,38 @@ function drawNotes(notes) {
   .text(acc);
 }
 
-function printResult(notes, majIndex, majKey) {
-	d3.select(svg)
+function printResult(notes, majIndex, majKey, churchMode) {
+
+  if (churchMode) {
+    d3.select(svg)
     .append("text")
     .style("fill", "black")
     .attr("x", 50)
     .attr("y", 50)
     .text("This is " + truncNote(notes[0]) + " " + MODES[majIndex]);
-
-  d3.select(svg)
+    
+    d3.select(svg)
     .append("text")
     .style("fill", "black")
     .attr("x", 50)
     .attr("y", 70)
     .text("which is in the key of " + truncNote(majKey) + " Major");
+  } else {
+    d3.select(svg)
+    .append("text")
+    .style("fill", "black")
+    .attr("x", 50)
+    .attr("y", 50)
+    .text("This is not a church mode");
+  }
+
+	
 }
 
-function constructVisualization(notes, majIndex, majKey) {
+function constructVisualization(notes, majIndex, majKey, churchMode) {
   drawStaff();
   drawNotes(notes);
-  printResult(notes, majIndex, majKey);
+  printResult(notes, majIndex, majKey, churchMode);
 }
 
 /**
@@ -460,8 +509,10 @@ function go(startNote) {
   // playing the scale out loud
   playScale(notes);
 
+  const churchMode = isChurchMode(orderedIntervals);
+
   // rendering the scale on the staff
-  constructVisualization(notes, majIndex, majKey);
+  constructVisualization(notes, majIndex, majKey, churchMode);
 
 }
 
