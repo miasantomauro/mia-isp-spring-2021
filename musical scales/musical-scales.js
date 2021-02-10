@@ -218,7 +218,7 @@ function truncNote(note) {
 }
 
 /**
- * given an arbitrary key, return an equivalent one that is one the circe of fifths
+ * given an arbitrary key, return an equivalent one that is one the circle of fifths
  * @param {string} key
  */
 function getValidKey(key) {
