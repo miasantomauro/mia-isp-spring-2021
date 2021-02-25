@@ -133,7 +133,7 @@ function messageY2(m) {
 }
 
 /*
- * The Following two functions will be called when certain mouse events are triggered!
+ * The Following two functions will be called when certain mouse events are triggered
 */
 
 /**
@@ -144,6 +144,13 @@ function messageY2(m) {
 function onMouseEnter(e, m) {
 
     // we can use "this" to refer to the element being hovered!
+
+    // change the color of the line to red
+    d3.select(this)
+        .select("line")
+        .attr("stroke", RED)
+
+    // red rectangle
     d3.select(this)
         .append("rect")
         .attr("x", 50)
@@ -153,6 +160,7 @@ function onMouseEnter(e, m) {
         .style("fill", RED)
         .style("opacity", .6);
 
+    // message label text 
     d3.select(this)
         .append("text")
         .attr("x", 60)
@@ -161,17 +169,14 @@ function onMouseEnter(e, m) {
         .style("fill", "black")
         .text(m._id);
 
+    // message data text
     d3.select(this)
         .append("text")
         .attr("x", 60)
         .attr("y", 550)
         .style("font-family", '"Open Sans", sans-serif')
         .style("fill", "black")
-        .text("Message \n Data: " + m.data);
-    
-    d3.select(this)
-        .select("line")
-        .attr("stroke", RED)
+        .text("Message Data: " + m.data);
 }
 
 /**
@@ -180,17 +185,23 @@ function onMouseEnter(e, m) {
  */
 function onMouseLeave(m) {
 
+    // change the color of the line back to green
     d3.select(this)
         .select("line")
         .attr("stroke", GREEN);
 
+    // remove the rectangle
     d3.select(this)
         .select('rect')
         .remove();
 
+    // remove all text
     d3.select(this)
         .selectAll('text')
         .remove();
+    
+    // the reason we don't just select remove all the children is because
+    // the line representing the message is also a child of this
 }
 
 // draw the messages
