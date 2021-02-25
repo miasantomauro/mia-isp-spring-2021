@@ -37,7 +37,7 @@ sig Message {
   sender: one Agent,
   receiver: one Agent,
   sendTime: one Timeslot,
-  recvTime: one Timeslot, -- was lone, changing it to one
+  recvTime: lone Timeslot,
   data: set Datum
 }
 -- Delay thinking about this: would raise Agent datum vs. Key datum distinction
