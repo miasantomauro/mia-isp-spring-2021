@@ -47,7 +47,7 @@ d3.select(svg)
 
 // draw the timeslots
 const t = d3.select(svg)
-    .selectAll("timeslots")
+    .selectAll("timeslot") // giving these shapes a name
     .data(timeslots)
     .join("line")
     .attr("x1", baseX)
@@ -60,17 +60,17 @@ const t = d3.select(svg)
 
 // label the timeslots
 const tLabel = d3.select(svg)
-    .selectAll("timeslotLabels")
+    .selectAll("timeslotLabel")
     .data(timeslots)
     .join("text")
     .attr("x", 5)
     .attr("y", y)
     .style("font-family", '"Open Sans", sans-serif')
-    .text((t) => t._id);
+    .text((t) => t._id); // any time you use a function with data, it's parameter is always the "current" datum
 
 // draw the agents
 const a = d3.select(svg)
-    .selectAll("agents")
+    .selectAll("agent")
     .data(agents)
     .join("line")
     .attr("stroke", BLUE)
@@ -82,7 +82,7 @@ const a = d3.select(svg)
 
 // label the agents
 const aLabel = d3.select(svg)
-    .selectAll("agentLabels")
+    .selectAll("agentLabel")
     .data(agents)
     .join("text")
     .attr("x", x)
@@ -132,11 +132,75 @@ function messageY2(m) {
     return y(m.recvTime);
 }
 
+/*
+ * The Following two functions will be called when certain mouse events are triggered!
+*/
+
+/**
+ * a function to display additional information about the given message
+ * @param {Event} e - the js event
+ * @param {Object} m - a message prop from the forge spec
+ */
+function onMouseEnter(e, m) {
+
+    // we can use "this" to refer to the element being hovered!
+    d3.select(this)
+        .append("rect")
+        .attr("x", 50)
+        .attr("y", 500)
+        .attr("width", 200)
+        .attr("height", 100)
+        .style("fill", RED)
+        .style("opacity", .6);
+
+    d3.select(this)
+        .append("text")
+        .attr("x", 60)
+        .attr("y", 530)
+        .style("font-family", '"Open Sans", sans-serif')
+        .style("fill", "black")
+        .text(m._id);
+
+    d3.select(this)
+        .append("text")
+        .attr("x", 60)
+        .attr("y", 550)
+        .style("font-family", '"Open Sans", sans-serif')
+        .style("fill", "black")
+        .text("Message \n Data: " + m.data);
+    
+    d3.select(this)
+        .select("line")
+        .attr("stroke", RED)
+}
+
+/**
+ * a function to hide any information that way displayed about the given message
+ * @param {Object} m - a message prop from the forge spec
+ */
+function onMouseLeave(m) {
+
+    d3.select(this)
+        .select("line")
+        .attr("stroke", GREEN);
+
+    d3.select(this)
+        .select('rect')
+        .remove();
+
+    d3.select(this)
+        .selectAll('text')
+        .remove();
+}
+
 // draw the messages
-const tdb = d3.select(svg)
-    .selectAll("tbd")
+const m = d3.select(svg)
+    .selectAll("message")
     .data(messages)
-    .join("line")
+    .join("g") // this is just a container
+    .on("mouseenter", onMouseEnter) // "mouseenter" event will now trigger our onMouseEnter function
+    .on("mouseleave", onMouseLeave) // "mouseleave" event will now trigger our onMouseLeave function
+    .append("line") // append a line (becomes a child of g)
     .attr("stroke", GREEN)
     .style("stroke-width", 10)
     .attr("x1", messageX1) // the sender
