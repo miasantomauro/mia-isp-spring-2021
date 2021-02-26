@@ -143,6 +143,9 @@ function messageY2(m) {
  */
 function onMouseEnter(e, m) {
 
+    const boxY = baseX + (timeslots.length * timeslotHeight);
+    const w = agents.length * agentWidth;
+
     // we can use "this" to refer to the element being hovered!
 
     // change the color of the line to red
@@ -153,9 +156,9 @@ function onMouseEnter(e, m) {
     // red rectangle
     d3.select(this)
         .append("rect")
-        .attr("x", 50)
-        .attr("y", 500)
-        .attr("width", 200)
+        .attr("x", baseX)
+        .attr("y", boxY)
+        .attr("width", w)
         .attr("height", 100)
         .style("fill", RED)
         .style("opacity", .6);
@@ -163,20 +166,22 @@ function onMouseEnter(e, m) {
     // message label text 
     d3.select(this)
         .append("text")
-        .attr("x", 60)
-        .attr("y", 530)
+        .attr("x", baseX + 10)
+        .attr("y", boxY + 20)
         .style("font-family", '"Open Sans", sans-serif')
         .style("fill", "black")
         .text(m._id);
 
+    const t = `${m.sender._id} sent ${m.data} to ${m.receiver._id}`;
+
     // message data text
     d3.select(this)
         .append("text")
-        .attr("x", 60)
-        .attr("y", 550)
+        .attr("x", baseX + 10)
+        .attr("y", boxY + 40)
         .style("font-family", '"Open Sans", sans-serif')
         .style("fill", "black")
-        .text("Message Data: " + m.data);
+        .text(t);
 }
 
 /**
