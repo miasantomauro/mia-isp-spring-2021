@@ -7,10 +7,10 @@ const agents = Agent.atoms(true);
 const messages = Message.atoms(true);
 
 // set some constants for our visualization
-const baseX = 100;
-const baseY = 50;
-const timeslotHeight = 50;
-const agentWidth = 120;
+const baseX = 120;
+const baseY = 100;
+const timeslotHeight = 60;
+const agentWidth = 100;
 const RED = "#E54B4B";
 const BLUE = "#0495c2";
 const GREEN = "#19eb0e";
@@ -52,7 +52,7 @@ const t = d3.select(svg)
     .join("line")
     .attr("x1", baseX)
     .attr("y1", y)
-    .attr("x2", agents.length * agentWidth)
+    .attr("x2", baseX + ((agents.length - 1)* agentWidth))
     .attr("y2", y)
     .attr('stroke', 'black')
     .attr('fill', 'white')
@@ -63,7 +63,7 @@ const tLabel = d3.select(svg)
     .selectAll("timeslotLabel")
     .data(timeslots)
     .join("text")
-    .attr("x", 5)
+    .attr("x", baseX - 90)
     .attr("y", y)
     .style("font-family", '"Open Sans", sans-serif')
     .text((t) => t._id); // any time you use a function with data, it's parameter is always the "current" datum
@@ -78,7 +78,7 @@ const a = d3.select(svg)
     .attr("x1", x)
     .attr("y1", baseY) 
     .attr("x2", x)
-    .attr("y2", timeslots.length * timeslotHeight);
+    .attr("y2", baseY + ((timeslots.length - 1) * timeslotHeight));
 
 // label the agents
 const aLabel = d3.select(svg)
