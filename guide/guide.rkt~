@@ -1,0 +1,26 @@
+#lang forge
+
+/*
+  Sample Data for Custom Visualization Guide
+  (https://docs.google.com/document/d/1CGvhezOA6BD7OMtoFPKf1Ao_meDOZiOX47OKu6Y8CjA/edit?usp=sharing)
+
+  Mia Santomauro Spring 2021 ISP
+  Adapted from my binary_relation.rkt solution from Spring 2020
+*/
+
+sig Atom {
+  r: set Atom
+}
+
+pred rules {
+  some r                -- nonempty
+  r.r in r              -- transitive
+  no iden & r       	-- irreflexive
+  ~r in r           	-- symmetric
+  ~r.r in iden          -- functional
+  r.~r in iden          -- injective/one-to-one
+  Atom in r.Atom        -- total
+  Atom in Atom.r        -- surjective/onto
+}
+
+run rules for 5 Atom
