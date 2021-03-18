@@ -1,4 +1,4 @@
-// TODO: determine a better way to test lol
+// This code can be pasted at the bottom of musical-scales.js to test its functions
 
 // half step
 console.log(halfStep("A3") === "A#3");
@@ -23,13 +23,13 @@ console.log(wholeStep("C4") === "D4");
 console.log(wholeStep("B4") === "C#5");
 console.log(wholeStep("D#3") === "F3");
 
-// getValidKey
-
+// getNoteEquiv
 console.log(getNoteEquiv("C4") === "C4");
 console.log(getNoteEquiv("C#4") === "Db4");
 console.log(getNoteEquiv("B#3") === "C4");
 console.log(getNoteEquiv("Eb5") === "D#5");
 console.log(getNoteEquiv("E#3") === "F3");
 
+// getValidKey
 console.log(getValidKey("C4") === "C4");
 console.log(getValidKey("Cb4") === "B3");
