@@ -41,7 +41,7 @@ sig Timeslot {
 }
 
 -- As agents are sent messages, they learn pieces of data --
-sig Agent {
+sig Agent extends Datum {
   learned_times: set Datum -> Timeslot
 }
 
