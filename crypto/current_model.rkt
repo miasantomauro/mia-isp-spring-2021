@@ -307,12 +307,11 @@ uniqOrig = O1->na->Alice + O1->nb->Bob
 
 }*/
 
-
+option verbose 10
 run {
   wellformed
 } for paperExploit
 
-option verbose 5
 /*run {
   wellformed
 } for exactly 3 Agent, 8 Timeslot, exactly 2 Message, exactly 1 Ciphertext, exactly 1 SymmetricKey, exactly 1 PublicKey, exactly 1 PrivateKey, exactly 10 Datum for {tick is linear}*/
