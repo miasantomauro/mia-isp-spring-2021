@@ -10,7 +10,7 @@ const messages = Message.atoms(true);
 const baseX = 150;
 const baseY = 150;
 const timeslotHeight = 80;
-const agentWidth = 150;
+const agentWidth = 180;
 const RED = "#E54B4B";
 const BLUE = "#0495c2";
 const GREEN = "#19eb0e";
@@ -90,7 +90,6 @@ const aLabel = d3.select(svg)
     .style("font-family", '"Open Sans", sans-serif')
     .text((a) => a._id);
 
-
 /*
  * The following four functions are helpers to determine 
  * the starting and ending coordinates for messages
@@ -143,38 +142,51 @@ function messageY2(m) {
  */
 function onMouseEnter(e, m) {
 
+    // console.log(m.data.tuples().map(tuple => tuple.toString()));
+
     const boxY = baseX + (timeslots.length * timeslotHeight);
     const w = agents.length * agentWidth;
 
-    // we can use "this" to refer to the element being hovered!
-
+    // we can use "this" to refer to the element being hovered
     // change the color of the line to red
     d3.select(this)
-        .select("line")
+        .selectAll("line")
         .attr("stroke", RED);
     
+    // grabbing the values of the x1, x2, and y1 attributes
     const labelX1 = parseInt(d3.select(this).select("line").attr("x1"));
     const labelX2 = parseInt(d3.select(this).select("line").attr("x2"));
-    const labelX = (labelX1 + labelX2) / 2.0;
     const labelY = parseInt(d3.select(this).select("line").attr("y1")) - 20;
 
-    // TODO: in progress
-    const pt = m.data.plaintext;
-    // console.log(pt);
-    // console.log(pt.length);
-    // console.log(Object.keys(pt));
-    // console.log(pt[0]);
+    // calculating the x value for the message's label
+    const labelX = (labelX1 + labelX2) / 2.0;
 
-    const ptString = "temp";
+    // grabbing the plaintext for this message's data
+    const pt = m.data.tuples().map(tuple => tuple.atoms()[0].plaintext.toString());
+
+    // TODO: more formatting (commas)
+    const ptString = pt;
 
     // hovering label
-    d3.select(this)
+    const label = d3.select(this)
         .append("text")
-        .attr("x", labelX)
+        .attr("x", labelX) // this is temporary
         .attr("y", labelY)
         .style("font-family", '"Open Sans", sans-serif')
         .style("fill", "black")
-        .text(`{${m.data.plaintext}}${m.data.encryptionKey}`);
+        .text(`{${ptString}}`);
+
+    // subscript for hovering label
+    label.append('tspan')
+        .text(`${m.data.encryptionKey}`)
+        .style('font-size', 12)
+        .attr('dx', 5)
+        .attr('dy', 5);
+
+    // compute text width 
+    const textWidth = label.node().getComputedTextLength();
+    // re-center text based on textWidth
+    label.attr("x", labelX - (textWidth / 2));
 
     // red rectangle
     d3.select(this)
@@ -195,7 +207,8 @@ function onMouseEnter(e, m) {
         .style("fill", "black")
         .text(m._id);
 
-    const t = `${m.sender._id} sent ${m.data} to ${m.receiver._id}`;
+    // the text for the red box
+    const t = `${m.sender._id} sent ${m.data} containing {${pt}} to ${m.receiver._id}`;
 
     // message data text
     d3.select(this)
@@ -215,7 +228,7 @@ function onMouseLeave(m) {
 
     // change the color of the line back to green
     d3.select(this)
-        .select("line")
+        .selectAll("line")
         .attr("stroke", GREEN);
 
     // remove the rectangle
@@ -232,48 +245,47 @@ function onMouseLeave(m) {
     // the line representing the message is also a child of this
 }
 
-// draw the messages
+// bind messages to m
 const m = d3.select(svg)
     .selectAll("message")
     .data(messages);
 
+// join g to m and give it event handlers
 const g = m.join('g')
     .on("click", () => {console.log("clicked")})
     .on("mouseenter", onMouseEnter) // "mouseenter" event will now trigger our onMouseEnter function
     .on("mouseleave", onMouseLeave) // "mouseleave" event will now trigger our onMouseLeave function
 
-g.append("line") // append a line (becomes a child of g)
+// draw lines to represent messages
+g.append("line")            // append a line (becomes a child of g)
+    .attr("x1", messageX1)  // the sender
+    .attr("y1", messageY1)  // the time sent
+    .attr("x2", messageX2)  // the receiver
+    .attr("y2", messageY2) // the time received
     .attr("stroke", GREEN)
-    .style("stroke-width", 10)
-    .attr("x1", messageX1) // the sender
-    .attr("y1", messageY1) // the time sent
-    .attr("x2", messageX2) // the receiver
-    .attr("y2", messageY2); // the time received
+    .style("stroke-width", 10);
+
+// functions for rendering arrows 
+const arrowX1 = (m) => messageX1(m) > messageX2(m) ? messageX2(m) + 20 : messageX2(m) - 20;
+const arrowTopY1 = (m) => messageY2(m) + 20;
+const arrowBottomY1 = (m) => messageY2(m) - 20;
+const arrowTopY2 = (m) => messageY2(m) - 3;
+const arrowBottomY2 = (m) => messageY2(m) + 3;
 
 // forming the top of the arrow
 g.append("line")
     .attr("stroke", GREEN)
     .style("stroke-width", 10)
-    .attr("x1", (m)=>{
-        if (messageX1(m) > messageX2(m)) {
-            return messageX2(m) + 20;
-        } else {
-            return messageX2(m) - 20;
-        }})
-    .attr("y1", (m)=>{return messageY2(m) + 20;})
+    .attr("x1", arrowX1)
+    .attr("y1", arrowTopY1)
     .attr("x2", messageX2)
-    .attr("y2", (m)=>{return messageY2(m) - 3;});
+    .attr("y2", arrowTopY2);
 
-// forming the top of the arrow
+// forming the bottom of the arrow
 g.append("line")
     .attr("stroke", GREEN)
     .style("stroke-width", 10)
-    .attr("x1", (m)=>{
-        if (messageX1(m) > messageX2(m)) {
-            return messageX2(m) + 20;
-        } else {
-            return messageX2(m) - 20;
-        }})
-    .attr("y1", (m)=>{return messageY2(m) - 20;})
+    .attr("x1", arrowX1)
+    .attr("y1", arrowBottomY1)
     .attr("x2", messageX2)
-    .attr("y2", (m)=>{return messageY2(m) + 3;});
+    .attr("y2", arrowBottomY2);
