@@ -1,5 +1,5 @@
 // clear the svg
-d3.selectAll("svg > *").remove();
+d3.select(svg).selectAll("*").remove();
 
 // grab data from forge spec
 const timeslots = Timeslot.atoms(true);
@@ -7,10 +7,10 @@ const agents = Agent.atoms(true);
 const messages = Message.atoms(true);
 
 // set some constants for our visualization
-const baseX = 120;
-const baseY = 100;
-const timeslotHeight = 60;
-const agentWidth = 100;
+const baseX = 150;
+const baseY = 150;
+const timeslotHeight = 80;
+const agentWidth = 150;
 const RED = "#E54B4B";
 const BLUE = "#0495c2";
 const GREEN = "#19eb0e";
@@ -86,7 +86,7 @@ const aLabel = d3.select(svg)
     .data(agents)
     .join("text")
     .attr("x", x)
-    .attr("y", baseY - 10)
+    .attr("y", baseY - 30)
     .style("font-family", '"Open Sans", sans-serif')
     .text((a) => a._id);
 
@@ -151,7 +151,30 @@ function onMouseEnter(e, m) {
     // change the color of the line to red
     d3.select(this)
         .select("line")
-        .attr("stroke", RED)
+        .attr("stroke", RED);
+    
+    const labelX1 = parseInt(d3.select(this).select("line").attr("x1"));
+    const labelX2 = parseInt(d3.select(this).select("line").attr("x2"));
+    const labelX = (labelX1 + labelX2) / 2.0;
+    const labelY = parseInt(d3.select(this).select("line").attr("y1")) - 20;
+
+    // TODO: in progress
+    const pt = m.data.plaintext;
+    // console.log(pt);
+    // console.log(pt.length);
+    // console.log(Object.keys(pt));
+    // console.log(pt[0]);
+
+    const ptString = "temp";
+
+    // hovering label
+    d3.select(this)
+        .append("text")
+        .attr("x", labelX)
+        .attr("y", labelY)
+        .style("font-family", '"Open Sans", sans-serif')
+        .style("fill", "black")
+        .text(`{${m.data.plaintext}}${m.data.encryptionKey}`);
 
     // red rectangle
     d3.select(this)
@@ -212,14 +235,45 @@ function onMouseLeave(m) {
 // draw the messages
 const m = d3.select(svg)
     .selectAll("message")
-    .data(messages)
-    .join("g") // this is just a container
+    .data(messages);
+
+const g = m.join('g')
+    .on("click", () => {console.log("clicked")})
     .on("mouseenter", onMouseEnter) // "mouseenter" event will now trigger our onMouseEnter function
     .on("mouseleave", onMouseLeave) // "mouseleave" event will now trigger our onMouseLeave function
-    .append("line") // append a line (becomes a child of g)
+
+g.append("line") // append a line (becomes a child of g)
     .attr("stroke", GREEN)
     .style("stroke-width", 10)
     .attr("x1", messageX1) // the sender
     .attr("y1", messageY1) // the time sent
     .attr("x2", messageX2) // the receiver
     .attr("y2", messageY2); // the time received
+
+// forming the top of the arrow
+g.append("line")
+    .attr("stroke", GREEN)
+    .style("stroke-width", 10)
+    .attr("x1", (m)=>{
+        if (messageX1(m) > messageX2(m)) {
+            return messageX2(m) + 20;
+        } else {
+            return messageX2(m) - 20;
+        }})
+    .attr("y1", (m)=>{return messageY2(m) + 20;})
+    .attr("x2", messageX2)
+    .attr("y2", (m)=>{return messageY2(m) - 3;});
+
+// forming the top of the arrow
+g.append("line")
+    .attr("stroke", GREEN)
+    .style("stroke-width", 10)
+    .attr("x1", (m)=>{
+        if (messageX1(m) > messageX2(m)) {
+            return messageX2(m) + 20;
+        } else {
+            return messageX2(m) - 20;
+        }})
+    .attr("y1", (m)=>{return messageY2(m) - 20;})
+    .attr("x2", messageX2)
+    .attr("y2", (m)=>{return messageY2(m) + 3;});
