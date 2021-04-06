@@ -168,7 +168,7 @@ all m: Message | {no m.new_message and no new_message.m} implies m.data in ((m.s
   (KeyPairs.pairs).PublicKey = PrivateKey
   PrivateKey.(KeyPairs.pairs) = PublicKey
   all privKey: PrivateKey | {one pubKey: PublicKey | privKey->pubKey in KeyPairs.pairs}
-
+  all priv1: PrivateKey | all priv2: PrivateKey - priv1 | all pub: PublicKey | priv1->pub in KeyPairs.pairs implies priv2->pub not in KeyPairs.pairs
 }
 
 /*inst boundedDemo {
@@ -211,7 +211,7 @@ Orig = O1
 uniqOrig = O1->na->Alice + O1->nb->Bob
 }*/
 
-
+/*
 inst paperExploit {
 Agent = Alice + Bob + Eve
 Attacker = Eve
@@ -246,7 +246,7 @@ new_message = Message3->Message4 + Message0->Message1
 
 Orig = O1
 uniqOrig = O1->na->Alice + O1->nb->Bob
-}
+}*/
 
 
 /*inst instNSExploit { 
@@ -307,11 +307,83 @@ uniqOrig = O1->na->Alice + O1->nb->Bob
 
 }*/
 
-option verbose 10
+/*inst tickInstance {tick is linear} 
+
 run {
   wellformed
-} for paperExploit
+} for paperExploit*/
 
 /*run {
   wellformed
 } for exactly 3 Agent, 8 Timeslot, exactly 2 Message, exactly 1 Ciphertext, exactly 1 SymmetricKey, exactly 1 PublicKey, exactly 1 PrivateKey, exactly 10 Datum for {tick is linear}*/
+
+-- NS AS PREDICATES STARTS HERE --
+
+
+sig Init extends Agent {
+}
+
+sig Resp extends Agent {
+}
+
+pred test1 {
+  some c: Ciphertext | c in Datum
+}
+
+pred ns_execution {
+
+  some t0: Timeslot | 
+  some t1: t0.^tick | 
+  some t2: t1.^tick | 
+  some m0: Message | 
+  some m1: Message - m0 | 
+  some m2: Message - m1 - m0 | 
+  some c0: Ciphertext | 
+  some c1: Ciphertext - c0 | 
+  some c2: Ciphertext - c1 - c0 | 
+  some i: Init | 
+  some r: Resp | 
+  some na: Datum - Agent| 
+  some nb: Datum - Agent - na| 
+  some pubka: PublicKey |
+  some pubkb: PublicKey - pubka | 
+  some privka: PrivateKey | 
+  some privkb: PrivateKey - privka| {
+
+    m0 not in Message.new_message and
+    m1 not in Message.new_message and
+    m2 not in Message.new_message and
+
+    m0.sendTime = t0 and
+    m1.sendTime = t1 and
+    m2.sendTime = t2 and
+    c0.plaintext = na + i and
+    c1.plaintext = na + nb and
+    c2.plaintext = nb and
+    m0.data = c0 and 
+    m1.data = c1 and
+    m2.data = c2 and
+    m0.sender = i and
+    m0.receiver = r and
+
+    m1.sender = r and
+    m1.receiver = i and
+
+    m2.sender = i and
+    m2.receiver = r and 
+
+    c1.encryptionKey = pubka and
+    c0.encryptionKey = pubkb and
+    c2.encryptionKey = pubkb and
+
+    --(KeyPairs.owners).i = privka and
+    --(KeyPairs.owners).r = privkb and
+
+    privka->pubka in KeyPairs.pairs and
+    privkb->pubkb in KeyPairs.pairs
+    
+  }
+
+}
+
+run {wellformed and ns_execution} for 15 Datum, 6 Key, 3 PublicKey, 5 Ciphertext, exactly 3 Agent, exactly 1 Init, exactly 1 Resp for {tick is linear}
