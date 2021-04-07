@@ -116,9 +116,7 @@ pred wellformed {
     {d.(Orig.uniqOrig) = a}
     }} 
 
-all m: Message | {no m.new_message and no new_message.m} implies m.data in ((m.sender).learned_times).(Timeslot - (m.sendTime).^tick)
---all m: Message | one m.attacker implies m.data in ((m.sender).learned_times).(Timeslot - (m.sendTime).^tick)
- 
+all m: Message | {no new_message.m} implies m.data in ((m.sender).learned_times).(Timeslot - (m.sendTime).^tick) 
 
   -- adding to the times that the attacker learns things --
   all d: Datum | all t: Timeslot | d->t in Attacker.learned_times iff {
@@ -356,8 +354,8 @@ pred ns_execution {
   some c2: Ciphertext - c1 - c0 | 
   some i: Init | 
   some r: Resp | 
-  some na: Datum - Agent| 
-  some nb: Datum - Agent - na| 
+  some na: Datum - Agent - Key| 
+  some nb: Datum - Agent - na - Key| 
   some pubka: PublicKey |
   some pubkb: PublicKey - pubka | 
   some privka: PrivateKey | 
