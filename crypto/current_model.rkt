@@ -88,7 +88,10 @@ pred wellformed {
   
   -- agents (excluding the attacker) only learn information that they are explicitly sent (this can be changed later)
   all d: Datum | all t: Timeslot | all a: Agent - Attacker | d->t in a.learned_times iff {
+    -- they have not already learned the datum -- 
     {d not in (a.learned_times).(Timeslot - t.*tick)} and 
+
+    -- They received the message
     {{some m: Message | {d in m.data and t = m.recvTime and m.receiver = a and no m.attacker}}
     or 
     -- d can be the plaintext of a ciphertext encrypted using a symmetric key which the agent has access to the key
@@ -330,6 +333,16 @@ pred test1 {
   some c: Ciphertext | c in Datum
 }
 
+pred exploit_search {
+  some na: Datum - Agent | 
+  some c: Ciphertext | 
+  some m: Message | {
+    m.data = c and
+    na in c.plaintext and
+    na in Attacker.learned_times.(Timeslot - (m.sendTime).^tick)
+  }
+}
+
 pred ns_execution {
 
   some t0: Timeslot | 
@@ -386,4 +399,4 @@ pred ns_execution {
 
 }
 
-run {wellformed and ns_execution} for 15 Datum, 6 Key, 3 PublicKey, 5 Ciphertext, exactly 3 Agent, exactly 1 Init, exactly 1 Resp for {tick is linear}
+run {wellformed and ns_execution and exploit_search} for 15 Datum, 6 Key, 3 PublicKey, 5 Ciphertext, exactly 3 Agent, exactly 1 Init, exactly 1 Resp for {tick is linear}
