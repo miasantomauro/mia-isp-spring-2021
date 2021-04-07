@@ -10,7 +10,7 @@ const messages = Message.atoms(true);
 const baseX = 150;
 const baseY = 150;
 const timeslotHeight = 80;
-const agentWidth = 180;
+const agentWidth = 220;
 const RED = "#E54B4B";
 const BLUE = "#0495c2";
 const GREEN = "#19eb0e";
@@ -86,7 +86,7 @@ const aLabel = d3.select(svg)
     .data(agents)
     .join("text")
     .attr("x", x)
-    .attr("y", baseY - 30)
+    .attr("y", baseY - 40)
     .style("font-family", '"Open Sans", sans-serif')
     .text((a) => a._id);
 
@@ -142,10 +142,11 @@ function messageY2(m) {
  */
 function onMouseEnter(e, m) {
 
-    // console.log(m.data.tuples().map(tuple => tuple.toString()));
-
     const boxY = baseX + (timeslots.length * timeslotHeight);
     const w = agents.length * agentWidth;
+
+    // grabbing the plaintext for this message's data
+    const pt = m.data.tuples().map(tuple => tuple.atoms()[0].plaintext.toString());
 
     // we can use "this" to refer to the element being hovered
     // change the color of the line to red
@@ -153,40 +154,6 @@ function onMouseEnter(e, m) {
         .selectAll("line")
         .attr("stroke", RED);
     
-    // grabbing the values of the x1, x2, and y1 attributes
-    const labelX1 = parseInt(d3.select(this).select("line").attr("x1"));
-    const labelX2 = parseInt(d3.select(this).select("line").attr("x2"));
-    const labelY = parseInt(d3.select(this).select("line").attr("y1")) - 20;
-
-    // calculating the x value for the message's label
-    const labelX = (labelX1 + labelX2) / 2.0;
-
-    // grabbing the plaintext for this message's data
-    const pt = m.data.tuples().map(tuple => tuple.atoms()[0].plaintext.toString());
-
-    // TODO: more formatting (commas)
-    const ptString = pt;
-
-    // hovering label
-    const label = d3.select(this)
-        .append("text")
-        .attr("x", labelX) // this is temporary
-        .attr("y", labelY)
-        .style("font-family", '"Open Sans", sans-serif')
-        .style("fill", "black")
-        .text(`{${ptString}}`);
-
-    // subscript for hovering label
-    label.append('tspan')
-        .text(`${m.data.encryptionKey}`)
-        .style('font-size', 12)
-        .attr('dx', 5)
-        .attr('dy', 5);
-
-    // compute text width 
-    const textWidth = label.node().getComputedTextLength();
-    // re-center text based on textWidth
-    label.attr("x", labelX - (textWidth / 2));
 
     // red rectangle
     d3.select(this)
@@ -201,6 +168,7 @@ function onMouseEnter(e, m) {
     // message label text 
     d3.select(this)
         .append("text")
+        .attr("class", "boxText")
         .attr("x", baseX + 10)
         .attr("y", boxY + 20)
         .style("font-family", '"Open Sans", sans-serif')
@@ -213,6 +181,7 @@ function onMouseEnter(e, m) {
     // message data text
     d3.select(this)
         .append("text")
+        .attr("class", "boxText")
         .attr("x", baseX + 10)
         .attr("y", boxY + 40)
         .style("font-family", '"Open Sans", sans-serif')
@@ -225,6 +194,7 @@ function onMouseEnter(e, m) {
  * @param {Object} m - a message prop from the forge spec
  */
 function onMouseLeave(m) {
+    console.log(this);
 
     // change the color of the line back to green
     d3.select(this)
@@ -238,11 +208,8 @@ function onMouseLeave(m) {
 
     // remove all text
     d3.select(this)
-        .selectAll('text')
+        .selectAll('.boxText')
         .remove();
-    
-    // the reason we don't just select remove all the children is because
-    // the line representing the message is also a child of this
 }
 
 // bind messages to m
@@ -289,3 +256,56 @@ g.append("line")
     .attr("y1", arrowBottomY1)
     .attr("x2", messageX2)
     .attr("y2", arrowBottomY2);
+
+function labelX() {
+    const l = d3.select(this.parentNode).select("line");
+    // grabbing the values of the x1, x2, and y1 attributes
+    const labelX1 = parseInt(l.attr("x1"));
+    const labelX2 = parseInt(l.attr("x2"));
+    // calculating and returing the x value for the message's label
+    return (labelX1 + labelX2) / 2.0;
+}
+
+function labelY() {
+    const l = d3.select(this.parentNode).select("line");
+    return parseInt(l.attr("y1")) - 20;
+}
+
+function labelText(m) {
+    // grabbing the plaintext for this message's data
+    const pt = m.data.tuples().map(tuple => tuple.atoms()[0].plaintext.toString());
+    // TODO: more formatting (commas)
+    const ptString = pt;
+    return `{${ptString}}`;
+}
+
+function subscriptText(m) {
+    return `${m.data.encryptionKey}`;
+}
+
+function centerText() {
+    // compute text width     
+    const textWidth = this.getComputedTextLength();
+    // grab current x value
+    const x = d3.select(this).attr("x");
+    // re-center text based on textWidth
+    return x - (textWidth / 2);
+}
+
+// adding labels
+const label = g.append("text")
+    .attr("x", labelX) // this is temporary
+    .attr("y", labelY)
+    .style("font-family", '"Open Sans", sans-serif')
+    .style("fill", "black")
+    .text(labelText);
+
+// subscript for hovering label
+label.append('tspan')
+    .text(subscriptText)
+    .style('font-size', 12)
+    .attr('dx', 5)
+    .attr('dy', 5);
+
+// center the text over the arrow
+label.attr("x", centerText);
