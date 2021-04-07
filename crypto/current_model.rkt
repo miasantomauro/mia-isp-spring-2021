@@ -172,164 +172,151 @@ all m: Message | {no new_message.m} implies m.data in ((m.sender).learned_times)
   all priv1: PrivateKey | all priv2: PrivateKey - priv1 | all pub: PublicKey | priv1->pub in KeyPairs.pairs implies priv2->pub not in KeyPairs.pairs
 }
 
-/*inst boundedDemo {
-Agent = Alice + Bob + Eve
-Attacker = Eve
-
-Timeslot = Timeslot0 + Timeslot1 + Timeslot2 + Timeslot3 + Timeslot4
-
-Datum = Agent + na + nb + nc + Ciphertext0 + Ciphertext1 + Ciphertext2 + Ciphertext3 + Ciphertext4 + PubKa + PubKb + PrivKa + PrivKb + PrivKc + PubKc  
-
-Ciphertext = Ciphertext0 + Ciphertext1 + Ciphertext2 + Ciphertext3 + Ciphertext4
-
-plaintext in Ciphertext0->na + Ciphertext0->Alice + Ciphertext1->na + Ciphertext1->Alice + Ciphertext2->na + Ciphertext2->nb + Ciphertext3->nb + Ciphertext4->nb + Ciphertext4->na + Ciphertext4->PubKc + Ciphertext4->PubKb
-encryptionKey in Ciphertext0->PubKc + Ciphertext1->PubKb + Ciphertext2->PubKa + Ciphertext3->PubKc + Ciphertext4->PubKb + Ciphertext4->PubKc + Ciphertext4->PubKb
-
-plaintext ni Ciphertext0->na + Ciphertext0->Alice + Ciphertext1->na + Ciphertext1->Alice + Ciphertext2->na + Ciphertext2->nb + Ciphertext3->nb + Ciphertext4->nb
-encryptionKey ni Ciphertext0->PubKc + Ciphertext1->PubKb + Ciphertext2->PubKa + Ciphertext3->PubKc + Ciphertext4->PubKb
-
-Key = PubKa + PubKb + PrivKa + PrivKb + PubKc + PrivKc
-PrivateKey = PrivKb + PrivKa + PrivKc
-PublicKey = PubKa + PubKb + PubKc
-
-Message = Message0 + Message1 + Message2 + Message3 + Message4
-sender = Message0->Alice + Message1->Alice + Message2->Bob + Message3->Alice + Message4->Alice
-receiver = Message0->Bob + Message1->Bob + Message2->Alice + Message3->Bob + Message4->Bob
-
-data = Message0->Ciphertext0 + Message1->Ciphertext1 + Message2->Ciphertext2 + Message3->Ciphertext3 + Message4->Ciphertext4
-sendTime = Message0->Timeslot0 + Message1->Timeslot1 + Message2->Timeslot2 + Message3->Timeslot3 + Message4->Timeslot4 
-
-tick = Timeslot0->Timeslot1 + Timeslot1->Timeslot2 + Timeslot2->Timeslot3 + Timeslot3->Timeslot4
-
-KeyPairs = KP1
-pairs = KP1->PrivKa->PubKa + KP1->PrivKb->PubKb + KP1->PrivKc->PubKc
-owners = KP1->PrivKa->Alice + KP1->PrivKb->Bob 
-
-attacker = Message3->Eve + Message0->Eve
-new_message = Message3->Message4 + Message0->Message1
-
-Orig = O1
-uniqOrig = O1->na->Alice + O1->nb->Bob
-}*/
-
-/*
-inst paperExploit {
-Agent = Alice + Bob + Eve
-Attacker = Eve
-
-Timeslot = Timeslot0 + Timeslot1 + Timeslot2 + Timeslot3 + Timeslot4
-
-Datum = Agent + na + nb + Ciphertext0 + Ciphertext1 + Ciphertext2 + Ciphertext3 + Ciphertext4 + PubKa + PubKb + PrivKa + PrivKb + PrivKc + PubKc  
-
-Ciphertext = Ciphertext0 + Ciphertext1 + Ciphertext2 + Ciphertext3 + Ciphertext4
-
-plaintext = Ciphertext0->na + Ciphertext0->Alice + Ciphertext1->na + Ciphertext1->Alice + Ciphertext2->na + Ciphertext2->nb + Ciphertext3->nb + Ciphertext4->nb
-encryptionKey = Ciphertext0->PubKc + Ciphertext1->PubKb + Ciphertext2->PubKa + Ciphertext3->PubKc + Ciphertext4->PubKb
-Key = PubKa + PubKb + PrivKa + PrivKb + PubKc + PrivKc
-PrivateKey = PrivKb + PrivKa + PrivKc
-PublicKey = PubKa + PubKb + PubKc
-
-Message = Message0 + Message1 + Message2 + Message3 + Message4
-sender = Message0->Alice + Message1->Alice + Message2->Bob + Message3->Alice + Message4->Alice
-receiver = Message0->Bob + Message1->Bob + Message2->Alice + Message3->Bob + Message4->Bob
-
-data = Message0->Ciphertext0 + Message1->Ciphertext1 + Message2->Ciphertext2 + Message3->Ciphertext3 + Message4->Ciphertext4
-sendTime = Message0->Timeslot0 + Message1->Timeslot1 + Message2->Timeslot2 + Message3->Timeslot3 + Message4->Timeslot4 
-
-tick = Timeslot0->Timeslot1 + Timeslot1->Timeslot2 + Timeslot2->Timeslot3 + Timeslot3->Timeslot4
-
-KeyPairs = KP1
-pairs = KP1->PrivKa->PubKa + KP1->PrivKb->PubKb + KP1->PrivKc->PubKc
-owners = KP1->PrivKa->Alice + KP1->PrivKb->Bob 
-
-attacker = Message3->Eve + Message0->Eve
-new_message = Message3->Message4 + Message0->Message1
-
-Orig = O1
-uniqOrig = O1->na->Alice + O1->nb->Bob
-}*/
-
-
-/*inst instNSExploit { 
-  -- Alice is init in this case
-  Agent = Alice + Bob + Eve
-  Attacker = Eve
-
-  Timeslot in Timeslot0 + Timeslot1 + Timeslot2 + Timeslot3 + Timeslot4
-  Timeslot ni Timeslot0 + Timeslot1 + Timeslot2 
-
-  Datum in Agent + n1 + n2 + n3 + Ciphertext0 + Ciphertext1 + Ciphertext2 + Ciphertext3 + Ciphertext4 + PubKa + PubKb + PrivKa + PrivKb + PrivKc + PubKc  
-  Datum ni Agent + n1 + n2 + Ciphertext0 + Ciphertext1 + Ciphertext2 + PubKa + PubKb + PrivKa + PrivKb
-
-  Ciphertext in Ciphertext0 + Ciphertext1 + Ciphertext2 + Ciphertext3 + Ciphertext4
-  Ciphertext ni Ciphertext0 + Ciphertext1 + Ciphertext2 
-
-  plaintext in Ciphertext0->n1 + Ciphertext0->Alice + Ciphertext1->n1 + Ciphertext1->n2 + Ciphertext2->n2 + Ciphertext3->Alice + Ciphertext3->n1 + Ciphertext4->n2
-  plaintext ni Ciphertext0->n1 + Ciphertext0->Alice + Ciphertext1->n1 + Ciphertext1->n2 + Ciphertext2->n2
-  
-  encryptionKey in Ciphertext0->PubKb + Ciphertext1->PubKa + Ciphertext2->PubKb + Ciphertext3->PubKb + Ciphertext3->PubKa + Ciphertext3->PubKc + Ciphertext4->PubKc
-  encryptionKey ni Ciphertext0->PubKb + Ciphertext1->PubKa + Ciphertext2->PubKb
-
-  Key in PubKa + PubKb + PrivKa + PrivKb + PubKc + PrivKc
-  Key ni PubKa + PubKb + PrivKa + PrivKb
-
-  PrivateKey in PrivKa + PrivKb + PrivKc
-  PrivateKey ni PrivKa + PrivKb
-
-  PublicKey in PubKa + PubKb + PubKc
-  PublicKey ni PubKa + PubKb
-
-  Message in Message0 + Message1 + Message2 + Message3 + Message4
-  Message ni Message0 + Message1 + Message2
-
-  sender in Message0->Alice + Message1->Bob + Message2->Alice + Message3->Alice + Message3->Bob + Message3->Eve + Message4->Alice
-  sender ni Message0->Alice + Message1->Bob + Message2->Alice
-
-  receiver in Message0->Bob + Message1->Alice + Message2->Bob + Message3->Alice + Message3->Bob + Message4->Bob
-  receiver ni Message0->Bob + Message1->Alice + Message2->Bob
-
-  data in Message0->Ciphertext0 + Message1->Ciphertext1 + Message2->Ciphertext2 + Message3->Ciphertext3 + Message4->Ciphertext4 + Message3->Ciphertext2 + Message3->Ciphertext1
-  data ni Message0->Ciphertext0 + Message1->Ciphertext1 + Message2->Ciphertext2
-
-  sendTime = Message0->Timeslot0 + Message1->Timeslot2 + Message2->Timeslot3 + Message3->Timeslot1 + Message4->Timeslot4 
-  --sendTime ni Message0->Timeslot0 + Message1->Timeslot1 + Message2->Timeslot2
-
-  tick = Timeslot0->Timeslot1 + Timeslot1->Timeslot2 + Timeslot2->Timeslot3 + Timeslot3->Timeslot4
-
-  KeyPairs = KP1
-  pairs = KP1->PrivKa->PubKa + KP1->PrivKb->PubKb + KP1->PrivKc->PubKc
-  owners in KP1->PrivKa->Alice + KP1->PrivKb->Bob + KP1->PrivKc->Alice + KP1->PrivKc->Bob
-  owners ni KP1->PrivKa->Alice + KP1->PrivKb->Bob
-
-  new_message = Message0->Message3 + Message2->Message4
-
-  Orig = O1
-  uniqOrig = O1->n1->Alice + O1->n2->Bob
-
-}*/
-
-/*inst tickInstance {tick is linear} 
-
-run {
-  wellformed
-} for paperExploit*/
-
-/*run {
-  wellformed
-} for exactly 3 Agent, 8 Timeslot, exactly 2 Message, exactly 1 Ciphertext, exactly 1 SymmetricKey, exactly 1 PublicKey, exactly 1 PrivateKey, exactly 10 Datum for {tick is linear}*/
 
 -- NS AS PREDICATES STARTS HERE --
+----------------------------------------------------------------------
 
+----- PROTOCOL DEFN -----
+
+/*
+  (defprotocol ns basic
+  (defrole init
+    (vars (a b name) (n1 n2 text))
+    (trace (send (enc n1 a (pubk b)))
+           (recv (enc n1 n2 (pubk a)))
+           (send (enc n2 (pubk b)))))
+  (defrole resp 
+    (vars (a b name) (n1 n2 text))
+    (trace (recv (enc n1 a (pubk b)))
+           (send (enc n1 n2 (pubk a)))
+           (recv (enc n2 (pubk b))))))
+*/
 
 sig Init extends Agent {
+  -- variables for an init strand:
+  init_a, init_b: one Agent, -- alias for Name
+  init_n1, init_n2: one Datum -- alias for Text
 }
 
 sig Resp extends Agent {
+  -- variables for a resp strand:
+  resp_a, resp_b: one Agent, -- alias for Name
+  resp_n1, resp_n2: one Datum -- alias for Text
 }
 
-pred test1 {
-  some c: Ciphertext | c in Datum
+pred ns_execution {
+
+  -- We are conflating 'role' and 'strand' somewhat, although
+  -- we think it is safe, since 'role' is embodied as a sig, and 
+  --   a strand is an atom of that role
+  -- ASSUMPTION: strands have exactly one role
+  -- ASSUMPTION: not interested in instances where protocol execution is incomplte
+  --    (we enforce all strands to observe their full trace)
+
+  all init: Init | {  
+    some t0: Timeslot | 
+    some t1: t0.^tick | 
+    some t2: t1.^tick | 
+    some m0: Message | 
+    some m1: Message - m0 | 
+    some m2: Message - m1 - m0 | {  
+      m0.sendTime = t0
+      m1.sendTime = t1
+      m2.sendTime = t2
+
+  --  (trace (send (enc n1 a (pubk b)))
+      -- contains local values for "a" and "n1"
+      m0.data.plaintext = init.init_a + init.init_n1
+      one m0.data
+      -- encrypted with public key of whoever is locally "b"
+      -- recall "owners" takes us to private key, and then lookup in pairs
+      m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
+      m0.sender = init
+  --         (recv (enc n1 n2 (pubk a)))
+      m1.data.plaintext = init.init_n1 + init.init_n2     
+      one m1.data
+      m1.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_a)]
+      m1.receiver = init
+  --         (send (enc n2 (pubk b)))))
+      m2.data.plaintext = init.init_n2   
+      one m2.data   
+      m2.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
+      m2.sender = init    
+    }      
+  }
+
+  all resp: Resp | {  
+    some t0: Timeslot | 
+    some t1: t0.^tick | 
+    some t2: t1.^tick | 
+    some m0: Message | 
+    some m1: Message - m0 | 
+    some m2: Message - m1 - m0 | {  
+      m0.sendTime = t0
+      m1.sendTime = t1
+      m2.sendTime = t2
+
+    --(trace (recv (enc n1 a (pubk b)))                
+      -- contains local values for "a" and "n1"
+      m0.data.plaintext = resp.resp_a + resp.resp_n1
+      one m0.data
+      -- encrypted with public key of whoever is locally "b"
+      -- recall "owners" takes us to private key, and then lookup in pairs
+      m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_b)]
+      m0.receiver = resp
+  --       (send (enc n1 n2 (pubk a)))
+      m1.data.plaintext = resp.resp_n1 + resp.resp_n2     
+      one m1.data
+      m1.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_a)]
+      m1.sender = resp
+  --        (recv (enc n2 (pubk b))))))
+      m2.data.plaintext = resp.resp_n2 
+      one m2.data     
+      m2.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_b)]
+      m2.receiver = resp
+    }      
+  }
 }
+
+----- SKELETON DEFNS -----
+
+/*
+(defskeleton ns
+ (vars (b name) (n1 text))
+ (defstrand init 3 (b b) (n1 n1))
+  (non-orig (privk b)) (uniq-orig n1)) 
+(defskeleton ns
+  (vars (a name) (n2 text))
+ (defstrand resp 3 (a a) (n2 n2))
+  (non-orig (privk a)) (uniq-orig n2))
+*/
+-- TODO: look at defskeleton and defstrand docs
+--  what is the (b b)?
+--  why say "3" there if init/resp traces have 3 messages each?
+
+-- Assume: defskeleton ns: the strands herein are NS roles
+-- Assume: defstrand init ... is talking about a specific init strand
+
+/* -- does this make sense? 
+abstract sig Skeleton {}
+sig Skeleton0 extends Skeleton {
+  s0_b: Agent,
+  s0_n1: Datum
+}
+sig Skeleton1 extends Skeleton {
+  s1_a: Agent,
+  s1_n2: Datum
+}
+*/
+// ??? 
+
+
+
+// TODO
+
+--pred test1 {
+--  some c: Ciphertext | c in Datum
+--}
 
 pred exploit_search {
   some na: Datum - Agent | 
@@ -341,60 +328,11 @@ pred exploit_search {
   }
 }
 
-pred ns_execution {
 
-  some t0: Timeslot | 
-  some t1: t0.^tick | 
-  some t2: t1.^tick | 
-  some m0: Message | 
-  some m1: Message - m0 | 
-  some m2: Message - m1 - m0 | 
-  some c0: Ciphertext | 
-  some c1: Ciphertext - c0 | 
-  some c2: Ciphertext - c1 - c0 | 
-  some i: Init | 
-  some r: Resp | 
-  some na: Datum - Agent - Key| 
-  some nb: Datum - Agent - na - Key| 
-  some pubka: PublicKey |
-  some pubkb: PublicKey - pubka | 
-  some privka: PrivateKey | 
-  some privkb: PrivateKey - privka| {
-
-    m0 not in Message.new_message and
-    m1 not in Message.new_message and
-    m2 not in Message.new_message and
-
-    m0.sendTime = t0 and
-    m1.sendTime = t1 and
-    m2.sendTime = t2 and
-    c0.plaintext = na + i and
-    c1.plaintext = na + nb and
-    c2.plaintext = nb and
-    m0.data = c0 and 
-    m1.data = c1 and
-    m2.data = c2 and
-    m0.sender = i and
-    m0.receiver = r and
-
-    m1.sender = r and
-    m1.receiver = i and
-
-    m2.sender = i and
-    m2.receiver = r and 
-
-    c1.encryptionKey = pubka and
-    c0.encryptionKey = pubkb and
-    c2.encryptionKey = pubkb and
-
-    --(KeyPairs.owners).i = privka and
-    --(KeyPairs.owners).r = privkb and
-
-    privka->pubka in KeyPairs.pairs and
-    privkb->pubkb in KeyPairs.pairs
-    
-  }
-
-}
-
-run {wellformed and ns_execution and exploit_search} for 15 Datum, 6 Key, 3 PublicKey, 5 Ciphertext, exactly 3 Agent, exactly 1 Init, exactly 1 Resp for {tick is linear}
+run {
+  wellformed 
+  ns_execution 
+  exploit_search
+} for 15 Datum, 6 Key, 3 PublicKey, 5 Ciphertext, exactly 3 Agent, 
+      exactly 1 Init, exactly 1 Resp 
+  for {tick is linear}
