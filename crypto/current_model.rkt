@@ -41,7 +41,7 @@ sig Timeslot {
 }
 
 -- As agents are sent messages, they learn pieces of data --
-sig Agent extends Datum {
+abstract sig Agent extends Datum {
   learned_times: set Datum -> Timeslot
 }
 
@@ -234,7 +234,8 @@ pred ns_execution {
       m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
       m0.sender = init
   --         (recv (enc n1 n2 (pubk a)))
-      m1.data.plaintext = init.init_n1 + init.init_n2     
+      m1.data.plaintext = init.init_n1 + init.init_n2    
+      init.init_n1 not in init.init_n2 
       one m1.data
       m1.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_a)]
       m1.receiver = init
