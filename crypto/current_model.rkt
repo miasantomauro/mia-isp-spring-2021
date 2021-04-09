@@ -164,7 +164,7 @@ all m: Message | {no new_message.m} implies m.data in ((m.sender).learned_times)
   -- plaintext relation is acyclic -- 
   all c: Ciphertext | c not in c.plaintext
 
-  some m : Message | Attacker in m.attacker
+  --some m : Message | Attacker in m.attacker
 
   (KeyPairs.pairs).PublicKey = PrivateKey
   PrivateKey.(KeyPairs.pairs) = PublicKey
@@ -227,6 +227,7 @@ pred ns_execution {
   --  (trace (send (enc n1 a (pubk b)))
       -- contains local values for "a" and "n1"
       m0.data.plaintext = init.init_a + init.init_n1
+
       one m0.data
       -- encrypted with public key of whoever is locally "b"
       -- recall "owners" takes us to private key, and then lookup in pairs
@@ -291,8 +292,8 @@ pred ns_execution {
   (non-orig (privk a)) (uniq-orig n2))
 */
 -- TODO: look at defskeleton and defstrand docs
---  what is the (b b)?
---  why say "3" there if init/resp traces have 3 messages each?
+--  what is the (b b)? ANSWER: this is defining the variable b in the role to the value of b
+--  why say "3" there if init/resp traces have 3 messages each?  This is the max height.  You could not put more than 3 here, but you can put less than 3
 
 -- Assume: defskeleton ns: the strands herein are NS roles
 -- Assume: defstrand init ... is talking about a specific init strand
@@ -314,10 +315,6 @@ sig Skeleton1 extends Skeleton {
 
 // TODO
 
---pred test1 {
---  some c: Ciphertext | c in Datum
---}
-
 pred exploit_search {
   some na: Datum - Agent | 
   some c: Ciphertext | 
@@ -332,7 +329,7 @@ pred exploit_search {
 run {
   wellformed 
   ns_execution 
-  exploit_search
+  --exploit_search
 } for 15 Datum, 6 Key, 3 PublicKey, 5 Ciphertext, exactly 3 Agent, 
       exactly 1 Init, exactly 1 Resp 
   for {tick is linear}
