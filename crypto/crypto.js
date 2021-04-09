@@ -6,6 +6,27 @@ const timeslots = Timeslot.atoms(true);
 const agents = Agent.atoms(true);
 const messages = Message.atoms(true);
 
+// map from timeslot -> Agent -> [Data]
+const learned_information = {};
+
+agents.forEach((agent) => {
+    const learned = agent.learned_times.tuples().map(tuple => tuple.atoms());
+    learned.map((info) => {
+        let ts = info[1].toString();
+        let d = info[0].toString();
+        let a = agent.toString();
+        if (learned_information[ts]) {
+            if (learned_information[ts][a]) {
+                learned_information[ts][a].push(d);
+            } else {
+                learned_information[ts][a] = [d];
+            }
+        } else {
+            learned_information[ts] = {a : [d]};
+        }
+    });
+});
+
 // set some constants for our visualization
 const baseX = 150;
 const baseY = 150;
@@ -58,11 +79,22 @@ const t = d3.select(svg)
     .attr('fill', 'white')
     .style("stroke-dasharray", ("5, 3"));
 
+/*
+sig Agent extends Datum {
+  learned_times: set Datum -> Timeslot
+}
+*/
+function onMouseClick(mouseevent, timeslot) {
+    // console.log(Init0.learned_times);
+    // console.log(Agent.learned_times.tuples().map(tuple => tuple.toString()));
+    console.log(learned_information[timeslot.toString()]);
+}
 // label the timeslots
 const tLabel = d3.select(svg)
     .selectAll("timeslotLabel")
     .data(timeslots)
     .join("text")
+    .on("click", onMouseClick)
     .attr("x", baseX - 90)
     .attr("y", y)
     .style("font-family", '"Open Sans", sans-serif')
@@ -194,7 +226,6 @@ function onMouseEnter(e, m) {
  * @param {Object} m - a message prop from the forge spec
  */
 function onMouseLeave(m) {
-    console.log(this);
 
     // change the color of the line back to green
     d3.select(this)
@@ -219,7 +250,6 @@ const m = d3.select(svg)
 
 // join g to m and give it event handlers
 const g = m.join('g')
-    .on("click", () => {console.log("clicked")})
     .on("mouseenter", onMouseEnter) // "mouseenter" event will now trigger our onMouseEnter function
     .on("mouseleave", onMouseLeave) // "mouseleave" event will now trigger our onMouseLeave function
 
@@ -309,3 +339,4 @@ label.append('tspan')
 
 // center the text over the arrow
 label.attr("x", centerText);
+
