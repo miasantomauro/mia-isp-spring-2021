@@ -6,9 +6,12 @@ const timeslots = Timeslot.atoms(true);
 const agents = Agent.atoms(true);
 const messages = Message.atoms(true);
 
-// map from timeslot -> Agent -> [Data]
+// map from Timeslot -> Agent -> [Data]
 const learned_information = {};
+// map from Timeslot -> Agent -> Boolean
+const visible_information = {};
 
+// populating the learned_information object
 agents.forEach((agent) => {
     const learned = agent.learned_times.tuples().map(tuple => tuple.atoms());
     learned.map((info) => {
@@ -23,6 +26,22 @@ agents.forEach((agent) => {
             }
         } else {
             learned_information[ts] = {a : [d]};
+        }
+    });
+});
+
+// populating the visible_information object (with all false values)
+timeslots.forEach((timeslot) => {
+    agents.forEach((agent) => {
+
+        const ts = timeslot.toString();
+        const a = agent.toString();
+
+        if (visible_information[ts]) {
+            visible_information[ts][a] = false;
+        } else {
+            visible_information[ts] = {};
+            visible_information[ts][a] = false;
         }
     });
 });
@@ -85,10 +104,62 @@ sig Agent extends Datum {
 }
 */
 function onMouseClick(mouseevent, timeslot) {
-    // console.log(Init0.learned_times);
-    // console.log(Agent.learned_times.tuples().map(tuple => tuple.toString()));
-    console.log(learned_information[timeslot.toString()]);
+
+    const ts = timeslot.toString();
+
+    agents.forEach((agent) => {
+
+        const a = agent.toString();
+        visible = visible_information[ts][a];
+        visible_information[ts][a] = !visible;
+
+        if (visible_information[ts][a]) {
+
+            // create a group and give it an id specific to this timeslot-agent pair
+            const g = d3.select(svg)
+                .append("g")
+                .attr("id", ts + a);
+        
+            // append the rect
+            g.append("rect")
+                .attr("x", x(agent))
+                .attr("y", () => y(timeslot) - 20)
+                .attr("width", 50)
+                .attr("height", 50)
+                .style("fill", "white")
+                .style("opacity", .7);
+            
+            // append the new information
+            g.append("text")
+                .attr("x", x(agent))
+                .attr("y", y(timeslot))
+                .style("font-family", '"Open Sans", sans-serif')
+                .style('fill', RED)
+                .text(learned_information[ts][a]);  
+
+            // collect the old information
+            const sliceIndex = timeslots.indexOf(timeslot);
+            const previousTimeslots = timeslots.slice(0, sliceIndex).map(t => t.toString());
+            let oldInfo = [];
+            previousTimeslots.forEach((old_ts) => {
+                oldInfo = oldInfo.concat(learned_information[old_ts][a]);
+            });
+
+            // append the old information
+            g.append("text")
+                .attr("x", x(agent))
+                .attr("y", () => y(timeslot) + 30)
+                .style("font-family", '"Open Sans", sans-serif')
+                .text(oldInfo);
+
+        } else {
+            // remove the group if this timeslot is not supposed to be visible
+            d3.select("#" + ts + a).remove(); 
+        }
+        
+    });      
 }
+
 // label the timeslots
 const tLabel = d3.select(svg)
     .selectAll("timeslotLabel")
@@ -287,6 +358,10 @@ g.append("line")
     .attr("x2", messageX2)
     .attr("y2", arrowBottomY2);
 
+/**
+ * a function to compute the x value of a label based on its parent position
+ * @returns the computed x value
+ */
 function labelX() {
     const l = d3.select(this.parentNode).select("line");
     // grabbing the values of the x1, x2, and y1 attributes
@@ -296,11 +371,20 @@ function labelX() {
     return (labelX1 + labelX2) / 2.0;
 }
 
+/**
+ * a function to compute the y value of a label based on its parent position
+ * @returns the computed y value
+ */
 function labelY() {
     const l = d3.select(this.parentNode).select("line");
     return parseInt(l.attr("y1")) - 20;
 }
 
+/**
+ * a function to construct the text of a label based on the given message
+ * @param {*} m - a message prop from the forge spec 
+ * @returns a string containing the text for the label
+ */
 function labelText(m) {
     // grabbing the plaintext for this message's data
     const pt = m.data.tuples().map(tuple => tuple.atoms()[0].plaintext.toString());
@@ -309,10 +393,19 @@ function labelText(m) {
     return `{${ptString}}`;
 }
 
+/**
+ * a function to construct the subscript text of a label
+ * @param {*} m - a message prop from the forge spec 
+ * @returns a string containing the text for the subscript
+ */
 function subscriptText(m) {
     return `${m.data.encryptionKey}`;
 }
 
+/**
+ * a function to center text based on its length
+ * @returns a new x value for the text
+ */
 function centerText() {
     // compute text width     
     const textWidth = this.getComputedTextLength();
@@ -339,4 +432,3 @@ label.append('tspan')
 
 // center the text over the arrow
 label.attr("x", centerText);
-
