@@ -3,7 +3,7 @@ const baseX = 150;
 const baseY = 150;
 const timeslotHeight = 80;
 const agentWidth = 220;
-const boxHeight = 50;
+const boxHeight = 80;
 const RED = "#E54B4B";
 const BLUE = "#0495C2";
 const GREEN = "#19EB0E";
@@ -367,13 +367,26 @@ function render() {
                 previousTimeslots.forEach((old_ts) => {
                     oldInfo = oldInfo.concat(learnedInformation[old_ts][a]);
                 });
-    
-                // append the old information
-                g.append("text")
-                    .attr("x", boxX + 5)
-                    .attr("y", () => boxY + 30)
-                    .style("font-family", '"Open Sans", sans-serif')
-                    .text(oldInfo);
+
+                // split the text so that there is no more than 3 items per line
+                const infoPerLine = 3;
+                const numberOfLines = oldInfo.length / infoPerLine;
+
+                let line;
+                for (line = 0; line < 5; line++) {
+
+                    let rangeStart = line * infoPerLine;
+                    let rangeEnd = line * infoPerLine + infoPerLine;
+
+                    const lineContents = oldInfo.slice(rangeStart, rangeEnd);
+
+                    // append the old information
+                    g.append("text")
+                        .attr("x", boxX + 5)
+                        .attr("y", () => boxY + 25 + (25 * line))
+                        .style("font-family", '"Open Sans", sans-serif')
+                        .text(lineContents);
+                }
     
             } else {
                 // remove the group if this timeslot is not supposed to be visible
