@@ -4,12 +4,7 @@
 (require syntax/parse syntax/parse/define)
 (require (for-syntax (only-in racket take last flatten)))
 ;(require racket/syntax)
-;(require racket/stxparam)
 ;(require "current_model.rkt") ; the base crypto modl
-
-;(define-syntax-parameter proto-exec-name #f)
-;(define-for-syntax proto-exec-name (make-parameter #f))
-
 
 ; For debugging speed, don't import the full spec yet
 (sig Agent)
@@ -19,22 +14,16 @@
 ;    (trace (send (enc n1 a (pubk b)))
 ;           (recv (enc n1 n2 (pubk a)))
 ;           (send (enc n2 (pubk b)))))
+
 (begin-for-syntax
-  
+
   (define-syntax-class defroleClass
     (pattern ((~literal defrole)
               rname:id
               vars:varsClass
               trace:traceClass)             
-             #:attr roleforge #`(begin
-                                  (sig rname #:extends Agent)
-                                 #,@(flatten
-                                     (for/list ([d (syntax->list #'(vars.decls ...))])
-                                      (let ([type (last (syntax->list d))])
-                                        (for/list ([varid (take (syntax->list d) (- (length (syntax->list d)) 1))])
-                                            #`(relation
-                                               #,(format-id #'rname "~a_~a" #'rname varid)
-                                               (rname #,type)))))))))
+             #:attr vardecls #'(vars.decls ...)
+             ))
   
 ;  (vars (a b name) (n1 n2 text))
   (define-syntax-class varsClass
@@ -59,51 +48,27 @@
               ((~literal pubk)
                pubkeyowner))))
     
-)
+) ; end begin-for-syntax
+
+(define-syntax (roleforge stx)
+  ;(printf "roleforge: ~a~n" stx)
+  (syntax-parse stx
+    [(roleforge pname:id role:defroleClass)     
+     #`(begin
+         (sig #,(format-id #'pname "~a_~a" #'pname #'role.rname) #:extends Agent) ; declare sig
+         #,@(flatten
+             (for/list ([decls (syntax->list #'role.vardecls)]) ; for each variable grouping                      
+               (let ([type (last (syntax->list decls))])      ; last element is the type
+                 (for/list ([varid (take (syntax->list decls) (- (length (syntax->list decls)) 1))]) ; for each var decl                          
+                   #`(relation
+                      #,(format-id #'role.rname "~a_~a_~a" #'pname #'role.rname varid)
+                      (role.rname #,type))))))
+         (pred #,(format-id #'pname "exec_~a_~a" #'pname #'role.rname) true))]))
 
 (define-syntax (defprotocol stx)
   (syntax-parse stx [(defprotocol pname:id ptype:id roles:defroleClass ...)
                      (quasisyntax/loc stx
-                       (begin roles.roleforge ...))]))
-
-;
-;
-;(define-syntax (defprotocol stx)
-;  (syntax-case stx (basic)
-;    [(defprotocol pname basic args ...)                 
-;     (parameterize
-;         ([proto-exec-name
-;           (lambda (rolename)
-;               (format-id #'pname "exec_~a_~a" #'pname rolename))])
-;       (syntax/loc stx 
-;         (begin args ...)))]))
-;
-;(define-syntax (defrole stx)
-;  (syntax-case stx (vars trace)
-;    [(defrole rname (vars vdecls ...) (trace msgs ...))
-;     ;(proto-exec-name #'rname) ; not bound here
-;     (with-syntax ([testpredname (proto-exec-name #'rname)])
-;      (quasisyntax/loc stx                           
-;          (begin   ; syntax-parameter-value ????
-;           (printf "pred is: ~a~n" testpredname)
-;           ;(sig rname #:extends Agent)
-;           (sig rname)
-;           ; (pred (predname args) body) or (pred nullarypredname body)
-;           ; no: pred is a macro
-;           ;(let ([testpredname (proto-exec-name rname)])
-;           ;  (pred testpredname true))
-;           
-;           ;(pred #,(syntax-local-introduce #'testpredname) true)
-;           ;(define testpredname true)
-;           ;6
-;           ;(pred (proto-exec-name rname) true) ; TODO fill in
-;           ;(pred testpredname true) 
-;          )))])) 
-;
-;;           (printf "todo handle var decls: ~a~n" '(vdecls ...))
-;           (printf "todo handle traces: ~a~n" '(msgs ...))
-;           (printf "defining: ~a~n" 'rname)
-
+                       (begin (roleforge pname roles) ...))]))
 
 (defprotocol ns basic
   (defrole init
@@ -120,19 +85,3 @@
 (hash-keys (forge:State-sigs forge:curr-state))
 (hash-keys (forge:State-relations forge:curr-state))
 (hash-keys (forge:State-pred-map forge:curr-state))
-
-;#lang racket
-;
-;(define-syntax (f stx)
-;  (syntax-case stx ()
-;    [(f x y)
-;     #`(begin
-;         (define-syntax (#,(datum->syntax stx 'g) stx2)
-;           (syntax-case stx2 ()
-;             [(g z)
-;              #'(println (format "~a ~a" x z))]))
-;         y)]))
-;
-;
-;(f 1 (g 2))
-;
