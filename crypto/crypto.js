@@ -2,18 +2,20 @@
 const baseX = 150;
 const baseY = 150;
 const timeslotHeight = 80;
-const agentWidth = 220;
-const boxHeight = 80;
-const RED = "#E54B4B";
-const BLUE = "#0495C2";
-const GREEN = "#19EB0E";
+const agentWidth = 300;
+let boxHeight = 110;
+const boxWidth = 200;
+const RED = '#E54B4B';
+const BLUE = '#0495C2';
+const GREEN = '#19EB0E';
+const BLACK = '#000000';
 
 // add defs to allow for custom fonts!
 // ref: (https://stackoverflow.com/questions/21025876/using-google-fonts-with-d3-js-and-svg)
 d3.select(svg)
-    .append("defs")
-    .append("style")
-    .attr("type", "text/css")
+    .append('defs')
+    .append('style')
+    .attr('type', 'text/css')
     .text("@import url('https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700,800');");
 
 // data from forge spec
@@ -150,10 +152,10 @@ function messageY2(m) {
  * @returns the computed x value
  */
 function labelX() {
-    const l = d3.select(this.parentNode).select("line");
+    const l = d3.select(this.parentNode).select('line');
     // grabbing the values of the x1, x2, and y1 attributes
-    const labelX1 = parseInt(l.attr("x1"));
-    const labelX2 = parseInt(l.attr("x2"));
+    const labelX1 = parseInt(l.attr('x1'));
+    const labelX2 = parseInt(l.attr('x2'));
     // calculating and returing the x value for the message's label
     return (labelX1 + labelX2) / 2.0;
 }
@@ -163,8 +165,8 @@ function labelX() {
  * @returns the computed y value
  */
 function labelY() {
-    const l = d3.select(this.parentNode).select("line");
-    return parseInt(l.attr("y1")) - 20;
+    const l = d3.select(this.parentNode).select('line');
+    return parseInt(l.attr('y1')) - 20;
 }
 
 /**
@@ -197,13 +199,11 @@ function centerText() {
     // compute text width     
     const textWidth = this.getComputedTextLength();
     // grab current x value
-    const x = d3.select(this).attr("x");
+    const x = d3.select(this).attr('x');
     // re-center text based on textWidth
     return x - (textWidth / 2);
 }
 
-function onMouseEnter(e, m) {}
-function onMouseLeave(m) {}
 function onMouseClick(mouseevent, timeslot) {
     const ts = timeslot.toString();
 
@@ -216,74 +216,102 @@ function onMouseClick(mouseevent, timeslot) {
     render();
 }
 
+function wrapText(container, startX, startY, textArray, color) {
+
+    // split the text so that there is no more than 3 items per line
+    const infoPerLine = 3;
+    const lineHeight = 20;
+    const numberOfLines = textArray.length / infoPerLine;
+
+    let line;
+    for (line = 0; line < numberOfLines; line++) {
+
+        let rangeStart = line * infoPerLine;
+        let rangeEnd = line * infoPerLine + infoPerLine;
+
+        const lineContents = textArray.slice(rangeStart, rangeEnd);
+
+        // append the old information
+        container.append('text')
+            .attr('x', startX)
+            .attr('y', () => startY + (lineHeight * line))
+            .style('font-family', '"Open Sans", sans-serif')
+            .style('fill', color)
+            .text(lineContents);
+    }
+
+    return numberOfLines * lineHeight;
+}
+
+
+
 function render() {
     // clear the svg
-    d3.select(svg).selectAll("*").remove();
+    d3.select(svg).selectAll('*').remove();
 
     // draw the timeslots
     const t = d3.select(svg)
-        .selectAll("timeslot") // giving these shapes a name
+        .selectAll('timeslot') // giving these shapes a name
         .data(timeslots)
-        .join("line")
-        .attr("x1", baseX)
-        .attr("y1", y)
-        .attr("x2", baseX + ((agents.length - 1) * agentWidth))
-        .attr("y2", y)
-        .attr('stroke', 'black')
+        .join('line')
+        .attr('x1', baseX)
+        .attr('y1', y)
+        .attr('x2', baseX + ((agents.length - 1) * agentWidth))
+        .attr('y2', y)
+        .attr('stroke', BLACK)
         .attr('fill', 'white')
-        .style("stroke-dasharray", ("5, 3"));
+        .style('stroke-dasharray', ('5, 3'));
 
     // label the timeslots
     const tLabel = d3.select(svg)
-        .selectAll("timeslotLabel")
+        .selectAll('timeslotLabel')
         .data(timeslots)
-        .join("text")
-        .on("click", onMouseClick)
-        .attr("x", baseX - 90)
-        .attr("y", y)
-        .style("font-family", '"Open Sans", sans-serif')
+        .join('text')
+        .on('click', onMouseClick)
+        .attr('x', baseX - 90)
+        .attr('y', y)
+        .style('font-family', '"Open Sans", sans-serif')
+        .style('cursor', 'pointer')
         .text((t) => t._id);
 
     // draw the agents
     const a = d3.select(svg)
-        .selectAll("agent")
+        .selectAll('agent')
         .data(agents)
-        .join("line")
-        .attr("stroke", BLUE)
-        .style("stroke-width", 10)
-        .attr("x1", x)
-        .attr("y1", baseY) 
-        .attr("x2", x)
-        .attr("y2", y(timeslots[timeslots.length - 1]));
+        .join('line')
+        .attr('stroke', BLUE)
+        .style('stroke-width', 10)
+        .attr('x1', x)
+        .attr('y1', baseY) 
+        .attr('x2', x)
+        .attr('y2', y(timeslots[timeslots.length - 1]));
 
     // label the agents
     const aLabel = d3.select(svg)
-        .selectAll("agentLabel")
+        .selectAll('agentLabel')
         .data(agents)
-        .join("text")
-        .attr("x", x)
-        .attr("y", baseY - 40)
-        .style("font-family", '"Open Sans", sans-serif')
+        .join('text')
+        .attr('x', x)
+        .attr('y', baseY - 40)
+        .style('font-family', '"Open Sans", sans-serif')
         .text((a) => a._id);
 
     // bind messages to m
     const m = d3.select(svg)
-        .selectAll("message")
+        .selectAll('message')
         .data(messages);
 
     // join g to m and give it event handlers
-    const g = m.join('g')
-        .on("mouseenter", onMouseEnter) // "mouseenter" event will now trigger our onMouseEnter function
-        .on("mouseleave", onMouseLeave) // "mouseleave" event will now trigger our onMouseLeave function
+    const g = m.join('g');
 
     // draw lines to represent messages
-    g.append("line")            // append a line (becomes a child of g)
-        .attr("x1", messageX1)  // the sender
-        .attr("y1", messageY1)  // the time sent
-        .attr("x2", messageX2)  // the receiver
-        .attr("y2", messageY2) // the time received
-        .attr("stroke", GREEN)
-        .style("stroke-width", 10);
+    g.append('line')            // append a line (becomes a child of g)
+        .attr('x1', messageX1)  // the sender
+        .attr('y1', messageY1)  // the time sent
+        .attr('x2', messageX2)  // the receiver
+        .attr('y2', messageY2) // the time received
+        .attr('stroke', GREEN)
+        .style('stroke-width', 10);
 
     // functions for rendering arrows 
     const arrowX1 = (m) => messageX1(m) > messageX2(m) ? messageX2(m) + 20 : messageX2(m) - 20;
@@ -293,29 +321,29 @@ function render() {
     const arrowBottomY2 = (m) => messageY2(m) + 3;
 
     // forming the top of the arrow
-    g.append("line")
-        .attr("stroke", GREEN)
-        .style("stroke-width", 10)
-        .attr("x1", arrowX1)
-        .attr("y1", arrowTopY1)
-        .attr("x2", messageX2)
-        .attr("y2", arrowTopY2);
+    g.append('line')
+        .attr('stroke', GREEN)
+        .style('stroke-width', 10)
+        .attr('x1', arrowX1)
+        .attr('y1', arrowTopY1)
+        .attr('x2', messageX2)
+        .attr('y2', arrowTopY2);
 
     // forming the bottom of the arrow
-    g.append("line")
-        .attr("stroke", GREEN)
-        .style("stroke-width", 10)
-        .attr("x1", arrowX1)
-        .attr("y1", arrowBottomY1)
-        .attr("x2", messageX2)
-        .attr("y2", arrowBottomY2);
+    g.append('line')
+        .attr('stroke', GREEN)
+        .style('stroke-width', 10)
+        .attr('x1', arrowX1)
+        .attr('y1', arrowBottomY1)
+        .attr('x2', messageX2)
+        .attr('y2', arrowBottomY2);
 
     // adding labels
-    const label = g.append("text")
-        .attr("x", labelX) // this is temporary
-        .attr("y", labelY)
-        .style("font-family", '"Open Sans", sans-serif')
-        .style("fill", "black")
+    const label = g.append('text')
+        .attr('x', labelX) // this is temporary
+        .attr('y', labelY)
+        .style('font-family', '"Open Sans", sans-serif')
+        .style('fill', BLACK)
         .text(labelText);
 
     // subscript for hovering label
@@ -326,7 +354,7 @@ function render() {
         .attr('dy', 5);
 
     // center the text over the arrow
-    label.attr("x", centerText);
+    label.attr('x', centerText);
 
     timeslots.forEach((timeslot) => {
         let ts = timeslot.toString();
@@ -334,31 +362,35 @@ function render() {
             let a = agent.toString();
             if (visibleInformation[ts][a]) {
 
-                const boxX = x(agent) - 20;
+                const boxX = x(agent) - (boxWidth / 2.0);
                 const boxY = y(timeslot) + 30;
-                const boxWidth = 100;
 
                 // create a group and give it an id specific to this timeslot-agent pair
                 const g = d3.select(svg)
-                    .append("g")
-                    .attr("id", ts + a);
+                    .append('g')
+                    .attr('id', ts + a);
             
                 // append the rect
-                g.append("rect")
-                    .attr("x", boxX)
-                    .attr("y", boxY)
-                    .attr("width", boxWidth)
-                    .attr("height", boxHeight)
-                    .style("fill", "white")
-                    .style("opacity", .7);
-                
-                // append the new information
-                g.append("text")
-                    .attr("x", boxX + 5)
-                    .attr("y", boxY + 10)
-                    .style("font-family", '"Open Sans", sans-serif')
-                    .style('fill', RED)
-                    .text(learnedInformation[ts][a]);  
+                g.append('rect')
+                    .attr('x', boxX)
+                    .attr('y', boxY)
+                    .attr('width', boxWidth)
+                    .attr('height', boxHeight)
+                    .attr('rx', 6)
+                    .attr('ry', 6)
+                    .style('fill', 'white')
+                    .style('opacity', .8)
+                    .attr('stroke', BLUE)
+                    .attr('stroke-width', '3');
+
+                const newInfo = learnedInformation[ts][a];
+                let textHeight;
+                if (newInfo) {
+                    // display the new info over multiple lines
+                    textHeight = wrapText(g, boxX + 5, boxY + 20, newInfo, RED);
+                } else {
+                    textHeight = 0;
+                }
     
                 // collect the old information
                 const sliceIndex = timeslots.indexOf(timeslot);
@@ -368,29 +400,14 @@ function render() {
                     oldInfo = oldInfo.concat(learnedInformation[old_ts][a]);
                 });
 
-                // split the text so that there is no more than 3 items per line
-                const infoPerLine = 3;
-                const numberOfLines = oldInfo.length / infoPerLine;
+                // display the old info over multiple lines
+                textHeight += wrapText(g, boxX + 5, boxY + textHeight + 40, oldInfo, BLACK);
 
-                let line;
-                for (line = 0; line < 5; line++) {
-
-                    let rangeStart = line * infoPerLine;
-                    let rangeEnd = line * infoPerLine + infoPerLine;
-
-                    const lineContents = oldInfo.slice(rangeStart, rangeEnd);
-
-                    // append the old information
-                    g.append("text")
-                        .attr("x", boxX + 5)
-                        .attr("y", () => boxY + 25 + (25 * line))
-                        .style("font-family", '"Open Sans", sans-serif')
-                        .text(lineContents);
-                }
+                // TODO: set boxHieight to be the max of itselft and textHeight + 20 or something
     
             } else {
                 // remove the group if this timeslot is not supposed to be visible
-                d3.select("#" + ts + a).remove(); 
+                d3.select('#' + ts + a).remove(); 
             }
         });
     });
