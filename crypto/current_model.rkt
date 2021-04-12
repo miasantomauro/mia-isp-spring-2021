@@ -404,6 +404,8 @@ pred temporary {
 }
 
 --option verbose 10
+/*
+-- commenting out since this is imported by the macro draft
 run {
   temporary
   wellformed 
@@ -415,3 +417,4 @@ run {
       exactly 1 Init, exactly 1 Resp, 
       exactly 1 SkeletonNS_0, exactly 1 SkeletonNS_1
   for {tick is linear}
+  */
