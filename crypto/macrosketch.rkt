@@ -4,6 +4,10 @@
 ; base crypto specification with protocol/skeleton-specific sigs and constraints.
 ;   Tim and Abby (Spring 2021)
 
+;https://hackage.haskell.org/package/cpsa-3.3.2/src/doc/cpsamanual.pdf
+; At the moment, we have prototype support for the "basic" algebra, using only
+;   asymmetric keys. 
+
 (require (for-syntax racket/syntax))
 (require syntax/parse syntax/parse/define)
 (require (for-syntax (only-in racket take last flatten)))
@@ -70,7 +74,8 @@
     (pattern x:id))
 
   ; (a1 a2)
-  (define-syntax-class bindingClass
+  ; Name is from CPSA docs
+  (define-syntax-class mapletClass
     (pattern (x1:id x2:id)))
 
   ; (comment "this is a comment")
@@ -82,7 +87,7 @@
     (pattern ((~literal defstrand)
               strandrole:id
               height:number
-              bindings:bindingClass ...)))
+              maplets:mapletClass ...)))
 
 ) ; end begin-for-syntax
 
@@ -184,3 +189,12 @@
 (hash-keys (forge:State-sigs forge:curr-state))
 (hash-keys (forge:State-relations forge:curr-state))
 (hash-keys (forge:State-pred-map forge:curr-state))
+
+; Notes:
+; Basic algebra has sorts (Table 10.3):
+;   text|data|name|tag|skey|akey|mesg
+;     skey and akey are symmetric and asymmetric keys
+;   data vs text: page 21 says they are interchangeable, but disjoint
+;     "both are available for cases where an analyst may wish to describe
+;      a protocol in which two types of simple values exist that cannot be
+;      confused for each other."
