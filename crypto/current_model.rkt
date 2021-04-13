@@ -225,6 +225,9 @@ pred ns_execution {
     some m0: Message | 
     some m1: Message - m0 | 
     some m2: Message - m1 - m0 | {  
+
+      all m3: Message - m0 - m2 | init not in m3.sender 
+
       m0.sendTime = t0
       m1.sendTime = t1
       m2.sendTime = t2
@@ -261,6 +264,8 @@ pred ns_execution {
     some m0: Message | 
     some m1: Message - m0 | 
     some m2: Message - m1 - m0 | {  
+      all m3: Message - m1 | resp not in m3.sender
+
       m0.sendTime = t0
       m1.sendTime = t1
       m2.sendTime = t2
@@ -389,19 +394,20 @@ pred exploit_search {
   some na: Datum - Agent | 
   some c: Ciphertext | 
   some m: Message | 
-  some nb: Datum - Agent - na | 
-  some c2: Ciphertext - c | 
-  some m2: Message - m | {
+  --some nb: Datum - Agent - na | 
+  --some c2: Ciphertext - c | 
+  --some m2: Message - m | 
+  {
     m.data = c and
-    na in c.plaintext and
-    na in Attacker.learned_times.(Timeslot - (m.sendTime).^tick) and
+    na in c.plaintext --and
+    na in Attacker.learned_times.Timeslot --and
 
-    m2.data = c2 and
+    /*m2.data = c2 and
     nb in c2.plaintext and
-    nb in Attacker.learned_times.(Timeslot - (m2.sendTime).^tick)
+    nb in Attacker.learned_times.(Timeslot - (m2.sendTime).^tick)*/
   }
 
-  some m: Message | Attacker in m.attacker
+  --some m: Message | Attacker in m.attacker
 }
 
 
@@ -427,7 +433,7 @@ run {
   constrain_skeletonNS_0
   constrain_skeletonNS_1
   exploit_search
-} for 20 Datum, exactly 6 Key, 3 PublicKey, 5 Ciphertext, exactly 3 Agent, 
+} for 18 Datum, 6 Key, 3 PublicKey, 5 Ciphertext, exactly 3 Agent, 
       exactly 1 Init, exactly 1 Resp, 
       exactly 1 SkeletonNS_0, exactly 1 SkeletonNS_1, 5 Timeslot
   for {tick is linear}
