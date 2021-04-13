@@ -226,7 +226,8 @@ pred ns_execution {
     some m1: Message - m0 | 
     some m2: Message - m1 - m0 | {  
 
-      all m3: Message - m0 - m2 | init not in m3.sender 
+      -- m2 does not send any other messages unless the messages they were sent were tampered with
+      all m3: Message - m0 - m2 - m0.new_message - m2.new_message | init not in m3.sender
 
       m0.sendTime = t0
       m1.sendTime = t1
@@ -264,7 +265,7 @@ pred ns_execution {
     some m0: Message | 
     some m1: Message - m0 | 
     some m2: Message - m1 - m0 | {  
-      all m3: Message - m1 | resp not in m3.sender
+      all m3: Message - m1 - m1.new_message | resp not in m3.sender
 
       m0.sendTime = t0
       m1.sendTime = t1
