@@ -121,6 +121,7 @@ pred wellformed {
   -- Messages comprise only values known by the sender
   all m: Message | {no new_message.m} implies m.data in ((m.sender).learned_times).(Timeslot - (m.sendTime).^tick) 
 
+
   -- adding to the times that the attacker learns things --
   all d: Datum | all t: Timeslot | d->t in Attacker.learned_times iff {
         -- d has not been learend already
@@ -237,6 +238,7 @@ pred ns_execution {
       -- recall "owners" takes us to private key, and then lookup in pairs
       m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
       m0.sender = init
+      m0 not in Message.new_message
   --         (recv (enc n1 n2 (pubk a)))
       m1.data.plaintext = init.init_n1 + init.init_n2    
       init.init_n1 not in init.init_n2 
@@ -244,6 +246,7 @@ pred ns_execution {
       m1.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_a)]
       m1.receiver = init
   --         (send (enc n2 (pubk b)))))
+      m2 not in Message.new_message
       m2.data.plaintext = init.init_n2   
       one m2.data   
       m2.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
@@ -275,11 +278,13 @@ pred ns_execution {
       one m1.data
       m1.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_a)]
       m1.sender = resp
+      m1 not in Message.new_message
   --        (recv (enc n2 (pubk b))))))
       m2.data.plaintext = resp.resp_n2 
       one m2.data     
       m2.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_b)]
       m2.receiver = resp
+      
     }      
   }
 }
@@ -342,10 +347,10 @@ pred constrain_skeletonNS_0 {
   
   -- nobody generates "a"'s private key (where "a" is in this skeleton's namespace)
   all a: Agent | 
-    KeyPairs.owners.(SkeletonNS_0.s0_a) not in a.generated_times.Timeslot
+    KeyPairs.owners.(SkeletonNS_0.s0_a) not in a.generated_times.Timeslot + (Attacker.learned_times).Timeslot
   -- ditto "b"
   all a: Agent | 
-    KeyPairs.owners.(SkeletonNS_0.s0_b) not in a.generated_times.Timeslot
+    KeyPairs.owners.(SkeletonNS_0.s0_b) not in a.generated_times.Timeslot + (Attacker.learned_times).Timeslot
 
   all a: Agent - SkeletonNS_0.strand0_0 | 
     SkeletonNS_0.s0_n1 not in a.generated_times.Timeslot
@@ -361,10 +366,10 @@ pred constrain_skeletonNS_1 {
 
   -- nobody generates "a"'s private key (where "a" is in this skeleton's namespace)
   all a: Agent | 
-    KeyPairs.owners.(SkeletonNS_1.s1_a) not in a.generated_times.Timeslot
+    KeyPairs.owners.(SkeletonNS_1.s1_a) not in a.generated_times.Timeslot + (Attacker.learned_times).Timeslot
   -- ditto "b"
   all a: Agent | 
-    KeyPairs.owners.(SkeletonNS_1.s1_b) not in a.generated_times.Timeslot
+    KeyPairs.owners.(SkeletonNS_1.s1_b) not in a.generated_times.Timeslot + (Attacker.learned_times).Timeslot
 
   all a: Agent - SkeletonNS_1.strand1_0 | 
     SkeletonNS_1.s1_n2 not in a.generated_times.Timeslot
@@ -383,11 +388,20 @@ pred constrain_skeletonNS_1 {
 pred exploit_search {
   some na: Datum - Agent | 
   some c: Ciphertext | 
-  some m: Message | {
+  some m: Message | 
+  some nb: Datum - Agent - na | 
+  some c2: Ciphertext - c | 
+  some m2: Message - m | {
     m.data = c and
     na in c.plaintext and
-    na in Attacker.learned_times.(Timeslot - (m.sendTime).^tick)
+    na in Attacker.learned_times.(Timeslot - (m.sendTime).^tick) and
+
+    m2.data = c2 and
+    nb in c2.plaintext and
+    nb in Attacker.learned_times.(Timeslot - (m2.sendTime).^tick)
   }
+
+  some m: Message | Attacker in m.attacker
 }
 
 
@@ -404,7 +418,7 @@ pred temporary {
 }
 
 --option verbose 10
-/*
+
 -- commenting out since this is imported by the macro draft
 run {
   temporary
@@ -412,9 +426,9 @@ run {
   ns_execution 
   constrain_skeletonNS_0
   constrain_skeletonNS_1
-  --exploit_search
-} for 15 Datum, 6 Key, 3 PublicKey, 5 Ciphertext, exactly 3 Agent, 
+  exploit_search
+} for 20 Datum, exactly 6 Key, 3 PublicKey, 5 Ciphertext, exactly 3 Agent, 
       exactly 1 Init, exactly 1 Resp, 
-      exactly 1 SkeletonNS_0, exactly 1 SkeletonNS_1
+      exactly 1 SkeletonNS_0, exactly 1 SkeletonNS_1, 5 Timeslot
   for {tick is linear}
-  */
+  
