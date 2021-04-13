@@ -400,8 +400,10 @@ pred exploit_search {
   --some m2: Message - m | 
   {
     m.data = c and
-    na in c.plaintext --and
-    na in Attacker.learned_times.Timeslot --and
+    na in c.plaintext and
+    na in Attacker.learned_times.Timeslot and
+    no new_message.m
+
 
     /*m2.data = c2 and
     nb in c2.plaintext and
