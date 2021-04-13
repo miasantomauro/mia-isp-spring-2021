@@ -96,17 +96,20 @@
          ; subsig for agents having this role
          (sig #,(format-id #'pname "~a_~a" #'pname #'role.rname) #:extends Agent) ; declare sig
          ; variable fields of that subsig as declared
-         #,@(flatten
-             (for/list ([decls (syntax->list #'role.vardecls)]) ; for each variable grouping                      
-               (let ([type (last (syntax->list decls))])      ; last element is the type
-                 (for/list ([varid (take (syntax->list decls) (- (length (syntax->list decls)) 1))]) ; for each var decl                          
-                   #`(relation
-                      #,(format-id #'role.rname "~a_~a_~a" #'pname #'role.rname varid)
-                      (role.rname #,type))))))
+         #,@(build-variable-fields #'role.vardecls #'pname #'role.rname)
          ; execution predicate for agents having this role
          (pred #,(format-id #'pname "exec_~a_~a" #'pname #'role.rname) true)
          ; ^ TODO predicate body
          )]))
+
+(define-for-syntax (build-variable-fields vardecls name1 name2 #:prefix [prefix ""])
+  (flatten
+   (for/list ([decls (syntax->list vardecls)]) ; for each variable grouping                      
+     (let ([type (last (syntax->list decls))])      ; last element is the type
+       (for/list ([varid (take (syntax->list decls) (- (length (syntax->list decls)) 1))]) ; for each var decl                          
+         #`(relation
+            #,(format-id name1 "~a~a_~a_~a" prefix name1 name2 varid)
+            (role.rname #,type)))))))
 
 ; Main macro for defprotocol declarations
 (define-syntax (defprotocol stx)
@@ -129,16 +132,20 @@
     (set-box! b (+ result 1))
     result))
 (define-for-syntax skeleton-index (box 0))
+
 (define-syntax (defskeleton stx)
   (syntax-parse stx [(defskeleton pname:id vars:varsClass strand:strandClass
                        non-orig:nonOrigClass uniq-orig:uniqOrigClass (~optional comment:commentClass))
-                     (quasisyntax/loc stx
-                       (begin
-                         ; subsig for skeleton
-                         (sig #,(format-id #'pname "skeleton_~a_~a" #'pname (unbox-and-increment skeleton-index)) #:one) ; declare sig
-                         ; TODO: variable fields (similar to protocol case)
-                         ; TODO: predicate
-                         ))]))
+                     (let ([idx (unbox-and-increment skeleton-index)])
+                       (quasisyntax/loc stx
+                         (begin
+                           ; subsig for skeleton
+                           (sig #,(format-id #'pname "skeleton_~a_~a" #'pname idx) #:one) ; declare sig
+                           ; variable fields (similar to protocol case: TODO -- factor)
+                           #,@(build-variable-fields #'(vars.decls ...) #'pname idx #:prefix "skeleton_")
+                           ; TODO: predicate body
+                           (pred #,(format-id #'pname "constrain_skeleton_~a_~a" #'pname idx) true)
+                           )))]))
 ;(pname vars strand non-orig uniq-orig comment)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
