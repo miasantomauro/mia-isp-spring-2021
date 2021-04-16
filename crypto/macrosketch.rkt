@@ -159,9 +159,28 @@
   #`(and #,(if prev-msg
                #`(in (join #,msg sendTime) (join #,prev-msg (^ sendTime)))
                #`true)
+         ; one content (TODO: is this safe to assert generally?)
+         (one (join msg data))
          ; Then assert event constraints
+         ; Sender or receiver
+         #,(if (equal? (ast-event-type ev) 'send)
+               (= THIS-STRAND-VAR (join msg receiver))
+               (= THIS-STRAND-VAR (join msg sender)))
+         
          ; TODO
      ))
+
+; (recv (enc n1 a (pubk b)))
+;
+;      one m0.data
+;      m0.receiver = resp ; or sender, depending on type of event
+
+;  m0.data.plaintext = resp.resp_a + resp.resp_n1
+;      -- encrypted with public key of whoever is locally "b"
+;      -- recall "owners" takes us to private key, and then lookup in pairs
+;      m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_b)]
+
+
 
 (define-for-syntax (build-role-predicate-body rolesig a-trace)
   ; E.g., ((msg0 . (rel Message)) (msg1 . (- (rel Message) msg0)) (msg2 . (- (- (rel Message) msg1) msg0)))
