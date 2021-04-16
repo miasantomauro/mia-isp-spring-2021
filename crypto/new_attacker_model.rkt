@@ -64,7 +64,7 @@ sig Message {
   sender: one Agent,
   receiver: one Agent,
   sendTime: one Timeslot,
-  recvTime: one Timeslot, -- was lone, changing it to one
+  recvTime: one Timeslot, 
   data: set Datum
 }
 
@@ -83,7 +83,7 @@ pred wellformed {
   -- someone cannot send a message to themselves
   all m: Message | m.sender not in m.receiver
   
-  -- agents only learn information that they are explicitly sent (this can be changed later)
+  -- agents only learn information that they are explicitly sent 
   all d: Datum | all t: Timeslot | all a: Agent | d->t in a.learned_times iff {
     -- they have not already learned the datum -- 
     {d not in (a.learned_times).(Timeslot - t.*tick)} and 
@@ -124,7 +124,6 @@ pred wellformed {
   -- plaintext relation is acyclic  
   --  NOTE WELL: if ever add another type of datum that contains data, + inside ^.
   all d: Datum | d not in d.^(plaintext)
-
 
   (KeyPairs.pairs).PublicKey = PrivateKey
   PrivateKey.(KeyPairs.pairs) = PublicKey
@@ -362,7 +361,7 @@ pred temporary {
 --option verbose 10
 
 -- commenting out since this is imported by the macro draft
-run {
+/*run {
   temporary
   wellformed 
   ns_execution 
@@ -372,4 +371,10 @@ run {
 } for 13 Datum, 4 Key, 2 PublicKey, 3 Ciphertext, exactly 3 Agent, 
       exactly 1 Init, exactly 1 Resp, 6 Message, 
       exactly 1 SkeletonNS_0, exactly 1 SkeletonNS_1, 6 Timeslot
+  for {tick is linear}*/
+
+run {
+  temporary
+  wellformed 
+} for 13 Datum, exactly 4 Key, exactly 2 PublicKey, 3 Ciphertext
   for {tick is linear}
