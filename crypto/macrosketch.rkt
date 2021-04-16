@@ -8,9 +8,17 @@
 ; At the moment, we have prototype support for the "basic" algebra, using only
 ;   asymmetric keys. 
 
+
+; Comments from Ben for integration with prototype:
+; each role is getting parsed twice (with defroleClass); make roleforge be a function and have defprotocol do more work --- unpacking things from each of the roles
+; could kill the flatten with the in-value trick: (for*/list ((decls ....) (type (in-value (last ....))) (varid ....)) ....)
+; the take could be drop-right
+; for order-independence:
+;    use the seq-no-order package https://docs.racket-lang.org/seq-no-order/index.html
+
 (require (for-syntax racket/syntax))
 (require syntax/parse syntax/parse/define)
-(require (for-syntax (only-in racket take last flatten)))
+(require (for-syntax (only-in racket take last flatten drop-right)))
 
 
 ; For debugging speed, don't import the full spec yet
@@ -28,36 +36,51 @@
   ;    (trace (send (enc n1 a (pubk b)))
   ;           (recv (enc n1 n2 (pubk a)))
   ;           (send (enc n2 (pubk b)))))
+  (struct ast-role (rname vars trace))
   (define-syntax-class defroleClass
     (pattern ((~literal defrole)
               rname:id
               vars:varsClass
               trace:traceClass)             
              #:attr vardecls #'(vars.decls ...)
+             #:attr tostruct #`(ast-role rname vars.tostruct trace.tostruct)
              ))
   
 ;  (vars (a b name) (n1 n2 text))
-  (define-syntax-class varsClass
-    (pattern ((~literal vars)
-              decls:varsGrouping ...)))
   (define-syntax-class varsGrouping
     (pattern (var-or-type:id ...)))
+  (struct ast-vars (assoc-decls))
+  (define-syntax-class varsClass
+    (pattern ((~literal vars)
+              decls:varsGrouping ...)
+             #:attr tostruct #`(ast-vars #,(apply append
+                                                  (for/list ([d (syntax->list #'(decls ...))])
+                                                    (let ([type (last (syntax->list d))])
+                                                      (for/list ([v (drop-right (syntax->list d) 1)])
+                                                        #''(#,v #,type))))))))  
   
 ;    (trace (send (enc n1 a (pubk b)))
 ;           (recv (enc n1 n2 (pubk a)))
-;           (send (enc n2 (pubk b)))))
+;           (send (enc n2 (pubk b)))))    
+  (struct ast-trace (events))
   (define-syntax-class traceClass
     (pattern ((~literal trace)
-              events:eventClass ...)))
-  
+              events:eventClass ...)
+             #:attr tostruct #`(ast-trace events.tostruct ...)))
+
+  (struct ast-event (type contents))
   (define-syntax-class eventClass
-    (pattern ((~literal send) enc:encClass))
-    (pattern ((~literal recv) enc:encClass)))
+    (pattern ((~literal send) enc:encClass)
+             #:attr tostruct #`(ast-event 'send enc.tostruct))
+    (pattern ((~literal recv) enc:encClass)
+             #:attr tostruct #`(ast-event 'recv enc.tostruct)))
+  
+  (struct ast-enc (key vals))
   (define-syntax-class encClass
     (pattern ((~literal enc)
               vals:id ...
-              ((~literal pubk)
-               pubkeyowner))))
+              key:datumClass)
+             #:attr tostruct #`(ast-enc key.tostruct (vals ...))))
 
   ;  (non-orig (privk a) (privk b))
   (define-syntax-class nonOrigClass
@@ -67,27 +90,35 @@
   (define-syntax-class uniqOrigClass
     (pattern ((~literal uniq-orig)
               data:datumClass ...)))
+  
   ; n1, a, (pubk a), (privk a)
+  (struct ast-datum (wrap id))
   (define-syntax-class datumClass
-    (pattern ((~literal privk) x:id))
-    (pattern ((~literal pubk) x:id))
-    (pattern x:id))
+    (pattern ((~literal privk) x:id)
+             #:attr tostruct #`(ast-datum 'privk 'id))
+    (pattern ((~literal pubk) x:id)
+             #:attr tostruct #`(ast-datum 'pubk 'id))
+    (pattern x:id
+             #:attr tostruct #`(ast-datum #f 'id)))
 
   ; (a1 a2)
   ; Name is from CPSA docs
   (define-syntax-class mapletClass
-    (pattern (x1:id x2:id)))
+    (pattern (x1:id x2:id)
+             #:attr tostruct #''(x1 x2)))
 
   ; (comment "this is a comment")
   (define-syntax-class commentClass
     (pattern ((~literal comment) comment:string)))
     
   ;  (defstrand resp 3 (a a) (b b) (n2 n2))
+  (struct ast-strand (role height maplets))
   (define-syntax-class strandClass
     (pattern ((~literal defstrand)
               strandrole:id
               height:number
-              maplets:mapletClass ...)))
+              maplets:mapletClass ...)
+             #:attr tostruct #`(ast-strand 'strandrole height '(maplets.tostruct ...))))
 
 ) ; end begin-for-syntax
 
@@ -96,25 +127,36 @@
 ; Produces forge declarations (sigs, relations, predicates...) for a role
 (define-syntax (roleforge stx)
   (syntax-parse stx
-    [(roleforge pname:id role:defroleClass)     
-     #`(begin
-         ; subsig for agents having this role
-         (sig #,(format-id #'pname "~a_~a" #'pname #'role.rname) #:extends Agent) ; declare sig
-         ; variable fields of that subsig as declared
-         #,@(build-variable-fields #'role.vardecls #'pname #'role.rname)
-         ; execution predicate for agents having this role
-         (pred #,(format-id #'pname "exec_~a_~a" #'pname #'role.rname) true)
-         ; ^ TODO predicate body
-         )]))
+    [(roleforge pname:id role:defroleClass)
+     (with-syntax ([rolesig (format-id #'pname "~a_~a" #'pname #'role.rname)])
+       #`(begin
+           ; subsig for agents having this role
+           (sig rolesig #:extends Agent) ; declare sig
+           ; variable fields of that subsig as declared
+           #,@(build-variable-fields #'role.vardecls #'pname #'role.rname #'rolesig)
+           ; execution predicate for agents having this role
+           (pred #,(format-id #'pname "exec_~a_~a" #'pname #'role.rname) #,(build-role-predicate-body #'rolesig #'role.trace))
+           ; ^ TODO predicate body
+           ))]))
 
-(define-for-syntax (build-variable-fields vardecls name1 name2 #:prefix [prefix ""])
+(define-for-syntax (build-variable-fields vardecls name1 name2 parent #:prefix [prefix ""])
   (flatten
    (for/list ([decls (syntax->list vardecls)]) ; for each variable grouping                      
      (let ([type (last (syntax->list decls))])      ; last element is the type
        (for/list ([varid (take (syntax->list decls) (- (length (syntax->list decls)) 1))]) ; for each var decl                          
          #`(relation
             #,(format-id name1 "~a~a_~a_~a" prefix name1 name2 varid)
-            (role.rname #,type)))))))
+            (#,parent #,type)))))))
+
+; Cannot get a-trace.events etc. outside syntax-parse. Instead, take a struct description
+(define-for-syntax (build-role-predicate-body rolesig a-trace)
+  (printf "traces: ~a~n" a-trace)
+  (let ([len #'traces.num-events])
+    (with-syntax ([rv (format-id rolesig "x_~a_~a" rolesig (gensym))])
+      #`(all ([rv #,rolesig])
+             (some ([temp Int]);(#,(for/list ([tr (syntax->list #'traces.events)]) [REPLACEME Timeslot]))
+                   true)))))
+
 
 ; Main macro for defprotocol declarations
 (define-syntax (defprotocol stx)
@@ -142,15 +184,16 @@
   (syntax-parse stx [(defskeleton pname:id vars:varsClass strand:strandClass
                        non-orig:nonOrigClass uniq-orig:uniqOrigClass (~optional comment:commentClass))
                      (let ([idx (unbox-and-increment skeleton-index)])
+                       (with-syntax ([parentsig (format-id #'pname "skeleton_~a_~a" #'pname idx)])
                        (quasisyntax/loc stx
                          (begin
                            ; subsig for skeleton
-                           (sig #,(format-id #'pname "skeleton_~a_~a" #'pname idx) #:one) ; declare sig
+                           (sig parentsig #:one) ; declare sig
                            ; variable fields (similar to protocol case: TODO -- factor)
-                           #,@(build-variable-fields #'(vars.decls ...) #'pname idx #:prefix "skeleton_")
+                           #,@(build-variable-fields #'(vars.decls ...) #'pname idx #'parentsig #:prefix "skeleton_")
                            ; TODO: predicate body
                            (pred #,(format-id #'pname "constrain_skeleton_~a_~a" #'pname idx) true)
-                           )))]))
+                           ))))]))
 ;(pname vars strand non-orig uniq-orig comment)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -189,7 +232,8 @@
 (hash-keys (forge:State-sigs forge:curr-state))
 (hash-keys (forge:State-relations forge:curr-state))
 (hash-keys (forge:State-pred-map forge:curr-state))
-
+(relation-typelist ns_init_a)
+(relation-typelist skeleton_ns_0_n1)
 ; Notes:
 ; Basic algebra has sorts (Table 10.3):
 ;   text|data|name|tag|skey|akey|mesg
