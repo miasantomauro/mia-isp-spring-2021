@@ -40,6 +40,7 @@
  ;owners: set PrivateKey -> Agent
 (relation pairs (KeyPairs PrivateKey PublicKey))
 (relation owners (KeyPairs PrivateKey Agent))
+(relation plaintext (CipherText Datum))
 
 ; TODO: swap above with the below, once finalized
 ;(require "current_model.rkt") ; the base crypto modl
@@ -97,9 +98,9 @@
   (struct ast-enc (key vals) #:transparent)
   (define-syntax-class encClass
     (pattern ((~literal enc)
-              vals:id ...
+              vals:datumClass ...
               key:datumClass)
-             #:attr tostruct (ast-enc (attribute key.tostruct) #'(vals ...))))
+             #:attr tostruct (ast-enc (attribute key.tostruct) (attribute vals.tostruct))))
 
   ;  (non-orig (privk a) (privk b))
   (define-syntax-class nonOrigClass
@@ -167,7 +168,7 @@
          (#,parent type)))))
 
 (define-for-syntax (build-event-assertion pname rname rolevar ev msg prev-msg)
-  (printf "assert: ~a ~a ~a ~a~n" rolevar ev msg prev-msg)
+  (printf "ast-event-contents ev: ~a~n" (ast-event-contents ev))
   ; First, assert temporal ordering on this message variable; msg happens strictly after prev-msg unless no prev-msg
   #`(and #,(if prev-msg
                #`(in (join #,msg sendTime) (join #,prev-msg (^ sendTime)))
@@ -181,16 +182,23 @@
          #,(if (equal? (ast-event-type ev) 'send)
                #`(= #,rolevar (join #,msg receiver))
                #`(= #,rolevar (join #,msg sender)))
-         ; What's in the message?
-         ; TODO: In general, we need to descend arbitrarily deep to say what the plaintext is
-         ;  m0.data.plaintext = resp.resp_a + resp.resp_n1         
-         ;(= (join msg data plaintext) xxx)
+         ; What's in the message? Order independent
+         ; If encrypted vs. non-encrypted
+
+         ; ASSUME: vals are just local variables TODO
+         ; TODO: but in general, we'd need to descend arbitrarily deep to say what the plaintext is
+         ;  m0.data.plaintext = resp.resp_a + resp.resp_n1
+         #,(let ([args (for/list ([a-datum (ast-enc-vals (ast-event-contents ev))])
+                         #`(join #,rolevar #,(format-id pname "~a_~a_~a" pname rname (ast-datum-value a-datum))))])
+             #`(= (join #,msg data plaintext)
+                  #,(if (> (length args) 1)
+                        #`(+ #,@args)         ; union of all plaintext's contents
+                        #`#,(first args))))   ; just a singleton content
+         
          ; What's the encryption key, if any?
          (= (join #,msg data encryptionKey)
-            #,(build-key-expression-for-event pname rname rolevar ev))            
-         ; TODO
-     ))
-
+            #,(build-key-expression-for-event pname rname rolevar ev))))
+ 
 (define-for-syntax (build-key-expression-for-event pname rname rolevar ev)
   (let* ([contents (ast-event-contents ev)]
          [key (ast-enc-key contents)]
