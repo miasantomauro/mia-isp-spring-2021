@@ -25,7 +25,21 @@
 (sig Agent)
 (sig Message)
 (sig Timeslot)
+(sig Datum)
+(sig KeyPairs #:one)
+(sig Ciphertext #:extends Datum)
+(sig Key #:extends Datum)
+(sig PrivateKey #:extends Key)
+(sig PublicKey #:extends Key)
 (relation sendTime (Message Timeslot))
+(relation data (Message Datum))
+(relation sender (Message Agent))
+(relation receiver (Message Agent))
+(relation encryptionKey (Ciphertext Key))
+ ;pairs: set PrivateKey -> PublicKey,
+ ;owners: set PrivateKey -> Agent
+(relation pairs (KeyPairs PrivateKey PublicKey))
+(relation owners (KeyPairs PrivateKey Agent))
 
 ; TODO: swap above with the below, once finalized
 ;(require "current_model.rkt") ; the base crypto modl
@@ -97,14 +111,14 @@
               data:datumClass ...)))
   
   ; n1, a, (pubk a), (privk a)
-  (struct ast-datum (wrap id) #:transparent)
+  (struct ast-datum (wrap value) #:transparent)
   (define-syntax-class datumClass
     (pattern ((~literal privk) x:id)
-             #:attr tostruct (ast-datum 'privk #'id))
+             #:attr tostruct (ast-datum 'privk #'x))
     (pattern ((~literal pubk) x:id)
-             #:attr tostruct (ast-datum 'pubk #'id))
+             #:attr tostruct (ast-datum 'pubk #'x))
     (pattern x:id
-             #:attr tostruct (ast-datum #f #'id)))
+             #:attr tostruct (ast-datum #f #'x)))
 
   ; (a1 a2)
   ; Name is from CPSA docs
@@ -141,9 +155,7 @@
              ; variable fields of that subsig as declared            
              #,@(build-variable-fields (ast-role-vars rolestruct) #'pname (ast-role-rname rolestruct) #'rolesig)
              ; execution predicate for agents having this role
-             (pred #,(format-id #'pname "exec_~a_~a" #'pname #'role.rname) #,(build-role-predicate-body #'rolesig (ast-role-trace rolestruct)))
-             ; ^ TODO predicate body
-           )))]))
+             (pred #,(format-id #'pname "exec_~a_~a" #'pname #'role.rname) #,(build-role-predicate-body #'pname #'role.rname #'rolesig (ast-role-trace rolestruct))))))]))
 
 ;(define-for-syntax (build-variable-fields vardecls name1 name2 parent #:prefix [prefix ""])
 (define-for-syntax (build-variable-fields vardecls name1 name2 parent #:prefix [prefix ""])  
@@ -154,35 +166,54 @@
          #,(format-id name1 "~a~a_~a_~a" prefix name1 name2 #'varid)
          (#,parent type)))))
 
-(define-for-syntax (build-event-assertion ev msg prev-msg)
+(define-for-syntax (build-event-assertion pname rname rolevar ev msg prev-msg)
+  (printf "assert: ~a ~a ~a ~a~n" rolevar ev msg prev-msg)
   ; First, assert temporal ordering on this message variable; msg happens strictly after prev-msg unless no prev-msg
   #`(and #,(if prev-msg
                #`(in (join #,msg sendTime) (join #,prev-msg (^ sendTime)))
                #`true)
          ; one content (TODO: is this safe to assert generally?)
-         (one (join msg data))
+         ;      one m0.data
+         (one (join #,msg data))
          ; Then assert event constraints
          ; Sender or receiver
+         ;      m0.receiver = resp ; or sender, depending on type of event
          #,(if (equal? (ast-event-type ev) 'send)
-               (= THIS-STRAND-VAR (join msg receiver))
-               (= THIS-STRAND-VAR (join msg sender)))
-         
+               #`(= #,rolevar (join #,msg receiver))
+               #`(= #,rolevar (join #,msg sender)))
+         ; What's in the message?
+         ; TODO: In general, we need to descend arbitrarily deep to say what the plaintext is
+         ;  m0.data.plaintext = resp.resp_a + resp.resp_n1         
+         ;(= (join msg data plaintext) xxx)
+         ; What's the encryption key, if any?
+         (= (join #,msg data encryptionKey)
+            #,(build-key-expression-for-event pname rname rolevar ev))            
          ; TODO
      ))
 
-; (recv (enc n1 a (pubk b)))
-;
-;      one m0.data
-;      m0.receiver = resp ; or sender, depending on type of event
+(define-for-syntax (build-key-expression-for-event pname rname rolevar ev)
+  (let* ([contents (ast-event-contents ev)]
+         [key (ast-enc-key contents)]
+         [local-knower (if key (format-id pname "~a_~a_~a" pname rname (ast-datum-value key)) #f)]) 
+    (cond [(and key (equal? 'privk (ast-datum-wrap key)))
+           ; The key belongs to someone corresponding to a variable in this strand
+           ; If a private key, we just look them up in owners
+           ; If a public key, we need to follow the private key into the pairs relation
+           #`(join KeyPairs owners (join #,rolevar #,local-knower))]
+          [(and key (equal? 'pubk (ast-datum-wrap key)))             
+           #`(join (join KeyPairs owners (join #,rolevar #,local-knower)) (join KeyPairs pairs))]
+          [key
+           (raise (error (format "Message was encrypted, but not with a key: ~a" contents)))]
+          [else #'none])))
 
-;  m0.data.plaintext = resp.resp_a + resp.resp_n1
 ;      -- encrypted with public key of whoever is locally "b"
 ;      -- recall "owners" takes us to private key, and then lookup in pairs
 ;      m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_b)]
 
 
-
-(define-for-syntax (build-role-predicate-body rolesig a-trace)
+; (recv (enc n1 a (pubk b)))
+  
+(define-for-syntax (build-role-predicate-body pname rname rolesig a-trace)
   ; E.g., ((msg0 . (rel Message)) (msg1 . (- (rel Message) msg0)) (msg2 . (- (- (rel Message) msg1) msg0)))
   (let ([msg-var-decls (for/list ([ev (ast-trace-events a-trace)]
                                   [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
@@ -200,7 +231,7 @@
                                   [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
                          (let ([msg (format-id (ast-event-orig ev) "msg~a" i)]
                                [prev-msg (if (> i 0) (format-id (ast-event-orig ev) "msg~a"  (- i 1)) #f)])
-                           (build-event-assertion ev msg prev-msg)))))))))
+                           (build-event-assertion pname rname #'rv ev msg prev-msg)))))))))
 
 
 ; Main macro for defprotocol declarations
@@ -234,8 +265,7 @@
                          (begin
                            ; subsig for skeleton
                            (sig parentsig #:one) ; declare sig
-                           ; variable fields (similar to protocol case: TODO -- factor)
-                           ;#,@(build-variable-fields #'(vars.decls ...) #'pname idx #'parentsig #:prefix "skeleton_")
+                           ; variable fields (similar to protocol case: TODO -- factor)                           
                            #,@(build-variable-fields (attribute vars.tostruct) #'pname idx #'rolesig #:prefix "skeleton_")
                            ; TODO: predicate body
                            (pred #,(format-id #'pname "constrain_skeleton_~a_~a" #'pname idx) true)
