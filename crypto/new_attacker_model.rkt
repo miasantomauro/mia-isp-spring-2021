@@ -71,7 +71,9 @@ sig Message {
 pred wellformed {
   -- Design choice: only one message event per timeslot;
   --   assume we have a shared notion of time
-  all t: Timeslot | lone sendTime.t + recvTime.t
+  
+  -- NOTE: I think this is not necessary anymore given sendTime and recvTime are the same ~Abby
+ all t: Timeslot | lone sendTime.t + recvTime.t
 
   -- Note: for the purposes of this demo, messages are received at the same time they are sent
   -- this is a design decision that should be discussed
@@ -104,7 +106,7 @@ pred wellformed {
     {d in PrivateKey and a = d.(KeyPairs.owners)}
     or
     -- Agent can encrypt things
-    {d in Ciphertext and d.encryptionKey in (a.learned_times).(Timeslot - t.^tick) and d.plaintext not in Ciphertext and d.plaintext in (a.learned_times).(Timeslot - t.*tick)}
+    {d in Ciphertext and d.encryptionKey in (a.learned_times).(Timeslot - t.^tick) and d.plaintext not in Ciphertext and d.plaintext in (a.learned_times).(Timeslot - t.^tick)}
     or
     -- Agents know their own names
     {d = a}
@@ -180,6 +182,7 @@ pred ns_execution {
     some m1: Message - m0 | 
     some m2: Message - m1 - m0 | {  
 
+    -- make this simpler 
 
       m0.sendTime = t0
       m1.sendTime = t1
@@ -356,6 +359,9 @@ pred temporary {
     (some KeyPairs.owners.a1 and a1 != a2) implies 
       (KeyPairs.owners.a1 != KeyPairs.owners.a2)
   }
+
+  -- number of keys greater than 0
+  #Key > 0
 }
 
 --option verbose 10
@@ -364,17 +370,29 @@ pred temporary {
 /*run {
   temporary
   wellformed 
-  ns_execution 
-  constrain_skeletonNS_0
-  constrain_skeletonNS_1
+  --ns_execution 
+  --constrain_skeletonNS_0
+  --constrain_skeletonNS_1
   --exploit_search
-} for 13 Datum, 4 Key, 2 PublicKey, 3 Ciphertext, exactly 3 Agent, 
-      exactly 1 Init, exactly 1 Resp, 6 Message, 
-      exactly 1 SkeletonNS_0, exactly 1 SkeletonNS_1, 6 Timeslot
+} for 13 Datum, exactly 4 Key, exactly 2 PublicKey, exactly 3 Ciphertext, exactly 3 Agent, 
+      exactly 1 Init, exactly 1 Resp, exactly 6 Message, exactly 2 Text,
+      exactly 1 SkeletonNS_0, exactly 1 SkeletonNS_1, exactly 6 Timeslot,
+      exactly 2 SkeletonNS, exactly 2 PrivateKey, exactly 0 SymmetricKey
   for {tick is linear}*/
 
+-- 2 publickey, 3 ciphertext, 3 agent
+-- All sigs that we have: Datum, Key, PrivateKey, PublicKey, SymmetricKey, Agent, Attacker, Ciphertext, Text, Message, Timeslot, KeyPairs
+-- NS specific sigs: Init, Resp, SkeletonNS, SkeletonNS_0, SkeletonNS_1
+
 run {
+  --temporary
+  --wellformed
+  --ns_execution
+} for 12 Datum, 2 Key, 1 PrivateKey, 1 PublicKey, 0 SymmetricKey, 1 Attacker, 1 Ciphertext, 1 Text, exactly 6 Message, 8 Timeslot, 1 KeyPairs, exactly 3 Agent
+
+-- might need to define that bounds 
+/*run {
   temporary
   wellformed 
-} for 13 Datum, exactly 4 Key, exactly 2 PublicKey, 3 Ciphertext
-  for {tick is linear}
+} for 13 Datum, exactly 4 Key, exactly 2 PublicKey, exactly 2 PrivateKey, exactly 3 Ciphertext
+  for {tick is linear}*/
