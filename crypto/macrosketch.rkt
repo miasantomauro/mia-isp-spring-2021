@@ -68,6 +68,7 @@
   
 ;  (vars (a b name) (n1 n2 text))
   (define-syntax-class varsGrouping
+    #:description "Variable declaration"
     (pattern (var-or-type:id ...)))
   (struct ast-vars (assoc-decls) #:transparent)
   (define-syntax-class varsClass
@@ -82,14 +83,16 @@
 ;    (trace (send (enc n1 a (pubk b)))
 ;           (recv (enc n1 n2 (pubk a)))
 ;           (send (enc n2 (pubk b)))))    
-  (struct ast-trace (events) #:transparent)
+  (struct ast-trace (events) #:transparent)  
   (define-syntax-class traceClass
+    #:description "Trace definition"
     (pattern ((~literal trace)
               events:eventClass ...)
              #:attr tostruct (ast-trace (attribute events.tostruct))))
 
   (struct ast-event (orig type contents) #:transparent)
   (define-syntax-class eventClass
+    #:description "Event definition"
     (pattern ((~literal send) enc:encClass)
              #:attr tostruct (ast-event #'this-syntax 'send (attribute enc.tostruct)))
     (pattern ((~literal recv) enc:encClass)
@@ -97,6 +100,7 @@
   
   (struct ast-enc (key vals) #:transparent)
   (define-syntax-class encClass
+    #:description "encrypted message"
     (pattern ((~literal enc)
               vals:datumClass ...
               key:datumClass)
@@ -104,16 +108,19 @@
 
   ;  (non-orig (privk a) (privk b))
   (define-syntax-class nonOrigClass
+    #:description "non-origination declaration"
     (pattern ((~literal non-orig)
               data:datumClass ...)))
   ;  (uniq-orig n2)
   (define-syntax-class uniqOrigClass
+    #:description "unique-origination declaration"
     (pattern ((~literal uniq-orig)
               data:datumClass ...)))
   
   ; n1, a, (pubk a), (privk a)
   (struct ast-datum (wrap value) #:transparent)
   (define-syntax-class datumClass
+    #:description "datum definition (an identifier, a public key, or a private key)"
     (pattern ((~literal privk) x:id)
              #:attr tostruct (ast-datum 'privk #'x))
     (pattern ((~literal pubk) x:id)
@@ -124,16 +131,19 @@
   ; (a1 a2)
   ; Name is from CPSA docs
   (define-syntax-class mapletClass
+    #:description "maplet"
     (pattern (x1:id x2:id)
              #:attr tostruct (list #'x1 #'x2)))
 
   ; (comment "this is a comment")
   (define-syntax-class commentClass
+    #:description "comment"
     (pattern ((~literal comment) comment:string)))
     
   ;  (defstrand resp 3 (a a) (b b) (n2 n2))
-  (struct ast-strand (role height maplets) #:transparent)
+  (struct ast-strand (role height maplets) #:transparent)  
   (define-syntax-class strandClass
+    #:description "strand definition"
     (pattern ((~literal defstrand)
               strandrole:id
               height:number
@@ -168,7 +178,7 @@
          (#,parent type)))))
 
 (define-for-syntax (build-event-assertion pname rname rolevar ev msg prev-msg)
-  (printf "ast-event-contents ev: ~a~n" (ast-event-contents ev))
+  ;(printf "ast-event-contents ev: ~a~n" (ast-event-contents ev))
   ; First, assert temporal ordering on this message variable; msg happens strictly after prev-msg unless no prev-msg
   #`(and #,(if prev-msg
                #`(in (join #,msg sendTime) (join #,prev-msg (^ sendTime)))
@@ -182,6 +192,13 @@
          #,(if (equal? (ast-event-type ev) 'send)
                #`(= #,rolevar (join #,msg receiver))
                #`(= #,rolevar (join #,msg sender)))
+
+         #,(cond [(equal? (ast-event-type ev) 'send)
+                  #`(= #,rolevar (join #,msg sender))]
+                 [(equal? (ast-event-type ev) 'recv)
+                  #`(= #,rolevar (join #,msg receiver))]
+                 [else (error (format "bad event type: ~a" (ast-event-type ev)))])
+         
          ; What's in the message? Order independent
          ; If encrypted vs. non-encrypted
 
