@@ -25,19 +25,23 @@ const messages = Message.atoms(true);
 
 // map from Timeslot -> Agent -> [Data]
 const learnedInformation = {};
+// map from Timeslot -> Agent -> [Data]
+const generatedInformation = {};
 // map from Timeslot -> Agent -> Boolean
 const visibleInformation = {};
 
 // populating the learnedInformation object
 agents.forEach((agent) => {
+
+    let a = agent.toString();
+
     // grab the learned_times data from the forge spec
     const learned = agent.learned_times.tuples().map(tuple => tuple.atoms());
 
     learned.map((info) => {
         // unpack the information
-        let ts = info[1].toString();
         let d = info[0].toString();
-        let a = agent.toString();
+        let ts = info[1].toString();
 
         if (!learnedInformation[ts]) {
             learnedInformation[ts] = {};
@@ -50,6 +54,28 @@ agents.forEach((agent) => {
         // store the information in our learnedInformation object
         learnedInformation[ts][a].push(d);
     });
+
+    // grab the generated_times data from the forge spec
+    const generated = agent.generated_times.tuples().map(tuple => tuple.atoms());
+
+    generated.map((info) => {
+        // unpack the information
+        let d = info[0].toString();
+        let ts = info[1].toString();
+
+        // TODO: store in generatedInformation
+        if (!generatedInformation[ts]) {
+            generatedInformation[ts] = {};
+        }
+
+        if (!generatedInformation[ts][a]) {
+            generatedInformation[ts][a] = [];
+        }
+
+        // store the information in our learnedInformation object
+        generatedInformation[ts][a].push(d);
+
+    })
 });
 
 // populating the visibleInformation object (initializing everything with false)
@@ -383,13 +409,27 @@ function render() {
                     .attr('stroke', BLUE)
                     .attr('stroke-width', '3');
 
+                let textHeight = 0;
+
                 const newInfo = learnedInformation[ts][a];
-                let textHeight;
+
+                // fetch any generated information and remove it from newInfo
+                if (generatedInformation[ts] && generatedInformation[ts][a]) {
+                    const generatedInfo = generatedInformation[ts][a];
+                    generatedInfo.forEach((x) => {
+
+                        const index = newInfo.indexOf(x);
+                        if (index > -1) {
+                            newInfo.splice(index, 1);
+                        }
+                    });
+
+                    textHeight += wrapText(g, boxX + 5, boxY + 15, generatedInfo, GREEN);
+                }
+                
                 if (newInfo) {
                     // display the new info over multiple lines
-                    textHeight = wrapText(g, boxX + 5, boxY + 20, newInfo, RED);
-                } else {
-                    textHeight = 0;
+                    textHeight += wrapText(g, boxX + 5,  boxY + textHeight + 30, newInfo, RED);
                 }
     
                 // collect the old information
@@ -401,9 +441,9 @@ function render() {
                 });
 
                 // display the old info over multiple lines
-                textHeight += wrapText(g, boxX + 5, boxY + textHeight + 40, oldInfo, BLACK);
+                textHeight += wrapText(g, boxX + 5, boxY + textHeight + 45, oldInfo, BLACK);
 
-                // TODO: set boxHieight to be the max of itselft and textHeight + 20 or something
+                // TODO: set boxHeight to be the max of itself and textHeight + 20 or something
     
             } else {
                 // remove the group if this timeslot is not supposed to be visible
