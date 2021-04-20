@@ -361,13 +361,6 @@ pred exploit_search {
 
 }
 
-//pred exploit_search {
-//
-//	some m: Message {
-//		m.data.encryptionKey in  KeyPairs.pairs[KeyPairs.owners.(Attacker)]
-//		}
-//}
-
 pred temporary {
   -- upper bounds for one sig have size > 1 at the moment; fix
   one Attacker
