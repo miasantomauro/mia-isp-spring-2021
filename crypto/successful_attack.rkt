@@ -213,7 +213,7 @@ pred ns_execution {
       one m0.data
       -- encrypted with public key of whoever is locally "b"
       -- recall "owners" takes us to private key, and then lookup in pairs
-      --m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
+      m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
       m0.sender = init
       init.init_b not in init
       init.init_a = init
@@ -221,12 +221,12 @@ pred ns_execution {
       m1.data.plaintext = init.init_n1 + init.init_n2    
       init.init_n1 not in init.init_n2 
       one m1.data
-      --m1.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_a)]
+      m1.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_a)]
       m1.receiver = init
   --         (send (enc n2 (pubk b)))))
       m2.data.plaintext = init.init_n2   
       one m2.data   
-      --m2.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
+      m2.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
       m2.sender = init    
     }      
   }
@@ -249,7 +249,7 @@ pred ns_execution {
       one m0.data
       -- encrypted with public key of whoever is locally "b"
       -- recall "owners" takes us to private key, and then lookup in pairs
-      --m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_b)]
+      m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_b)]
       m0.receiver = resp
   --       (send (enc n1 n2 (pubk a)))
       m1.data.plaintext = resp.resp_n1 + resp.resp_n2     
@@ -322,13 +322,6 @@ pred constrain_skeletonNS_0 {
   -- (uniq-orig n1)
   -- ASSUME: meaning of these operators is correct ; it is likely not quite
   --   do we, e.g., need to also assume that the generation EXISTS for unique?
-  
-  -- nobody generates "a"'s private key (where "a" is in this skeleton's namespace)
-  all a: Agent | 
-    KeyPairs.owners.(SkeletonNS_0.s0_a) not in a.generated_times.Timeslot + (Attacker.learned_times).Timeslot
-  -- ditto "b"
-  all a: Agent | 
-    KeyPairs.owners.(SkeletonNS_0.s0_b) not in a.generated_times.Timeslot + (Attacker.learned_times).Timeslot
 
   all a: Agent - SkeletonNS_0.strand0_0 | 
     SkeletonNS_0.s0_n1 not in a.generated_times.Timeslot
@@ -341,13 +334,6 @@ pred constrain_skeletonNS_1 {
 
   -- (non-orig (privk b) (privk a))
   -- (uniq-orig n2)
-
-  -- nobody generates "a"'s private key (where "a" is in this skeleton's namespace)
-  all a: Agent | 
-    KeyPairs.owners.(SkeletonNS_1.s1_a) not in a.generated_times.Timeslot + (Attacker.learned_times).Timeslot
-  -- ditto "b"
-  all a: Agent | 
-    KeyPairs.owners.(SkeletonNS_1.s1_b) not in a.generated_times.Timeslot + (Attacker.learned_times).Timeslot
 
   all a: Agent - SkeletonNS_1.strand1_0 | 
     SkeletonNS_1.s1_n2 not in a.generated_times.Timeslot
