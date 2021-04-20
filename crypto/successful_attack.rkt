@@ -188,18 +188,12 @@ pred ns_execution {
   --    (we enforce all strands to observe their full trace)
 
   all init: Init | {  
-    some t0: Timeslot | 
-    some t1: t0.^next | 
-    some t2: t1.^next | 
     some m0: Message | 
     some m1: Message - m0 | 
     some m2: Message - m1 - m0 | {  
 
-    -- make this simpler 
-
-      m0.sendTime = t0
-      m1.sendTime = t1
-      m2.sendTime = t2
+      m1.sendTime in m0.sendTime.^next
+      m2.sendTime in m1.sendTime.^next
 
   --  (trace (send (enc n1 a (pubk b)))
       -- contains local values for "a" and "n1"
@@ -227,16 +221,12 @@ pred ns_execution {
   }
 
   all resp: Resp | {  
-    some t0: Timeslot | 
-    some t1: t0.^next | 
-    some t2: t1.^next | 
     some m0: Message | 
     some m1: Message - m0 | 
     some m2: Message - m1 - m0 | {  
 
-      m0.sendTime = t0
-      m1.sendTime = t1
-      m2.sendTime = t2
+      m1.sendTime in m0.sendTime.^next
+      m2.sendTime in m1.sendTime.^next
 
     --(trace (recv (enc n1 a (pubk b)))                
       -- contains local values for "a" and "n1"
