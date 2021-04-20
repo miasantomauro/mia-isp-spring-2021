@@ -40,11 +40,6 @@ sig Timeslot {
   next: lone Timeslot
 }
 
--- rename tick to next everywhere
--- might need to add additional constraints to make tick a linear ordering
--- makes bounds exact
-
-
 -- As agents are sent messagest, they learn pieces of data --
 abstract sig Agent extends Datum {
   learned_times: set Datum -> Timeslot,
