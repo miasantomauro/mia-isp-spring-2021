@@ -190,7 +190,7 @@ function messageX2(m) {
  * @param {Object} m - a message prop from the forge spec
  */
 function messageY1(m) {
-    return y(m.sendTime);
+    return y(m.sendTime); // TODO
 }
 
 /**
@@ -199,7 +199,7 @@ function messageY1(m) {
  * @param {Object} m - a message prop from the forge spec
  */
 function messageY2(m) {
-    return y(m.recvTime);
+    return y(m.recvTime); // TODO: 
 }
 
 /**
@@ -242,8 +242,7 @@ function labelText(m) {
             return datum;
         }
     });
-    // TODO: more formatting (commas)
-    // TODO: pub key and priv key check
+    // TODO: more formatting (commas) ?
     const ptString = pt;
     return `{${ptString}}`;
 }
@@ -254,7 +253,6 @@ function labelText(m) {
  * @returns a string containing the text for the subscript
  */
 function subscriptText(m) {
-    // TODO: pub key and priv key check
     let pubKey = m.data.encryptionKey.toString();
     let owner = pubKeyMap[pubKey];
     return `pubK${owner}`;
