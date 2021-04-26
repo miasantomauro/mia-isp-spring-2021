@@ -1,9 +1,9 @@
 // constants for our visualization
 const baseX = 150;
-const baseY = 150;
+const baseY = 100;
 const timeslotHeight = 80;
 const agentWidth = 300;
-let boxHeight = 110;
+let boxHeight = 130;
 const boxWidth = 200;
 const RED = '#E54B4B';
 const BLUE = '#0495C2';
@@ -25,19 +25,29 @@ const messages = Message.atoms(true);
 
 // map from Timeslot -> Agent -> [Data]
 const learnedInformation = {};
+// map from Timeslot -> Agent -> [Data]
+const generatedInformation = {};
 // map from Timeslot -> Agent -> Boolean
 const visibleInformation = {};
+// map from Datum -> Message
+const dataMessageMap = {};
+// map from public key (Datum) -> owner (Agent)
+const pubKeyMap = {};
+// map from private key (Datum) -> owner (Agent)
+const privKeyMap = {};
 
 // populating the learnedInformation object
 agents.forEach((agent) => {
+
+    let a = agent.toString();
+
     // grab the learned_times data from the forge spec
     const learned = agent.learned_times.tuples().map(tuple => tuple.atoms());
 
     learned.map((info) => {
         // unpack the information
-        let ts = info[1].toString();
         let d = info[0].toString();
-        let a = agent.toString();
+        let ts = info[1].toString();
 
         if (!learnedInformation[ts]) {
             learnedInformation[ts] = {};
@@ -50,6 +60,27 @@ agents.forEach((agent) => {
         // store the information in our learnedInformation object
         learnedInformation[ts][a].push(d);
     });
+
+    // grab the generated_times data from the forge spec
+    const generated = agent.generated_times.tuples().map(tuple => tuple.atoms());
+
+    generated.map((info) => {
+        // unpack the information
+        let d = info[0].toString();
+        let ts = info[1].toString();
+
+        if (!generatedInformation[ts]) {
+            generatedInformation[ts] = {};
+        }
+
+        if (!generatedInformation[ts][a]) {
+            generatedInformation[ts][a] = [];
+        }
+
+        // store the information in our generatedInformation object
+        generatedInformation[ts][a].push(d);
+
+    })
 });
 
 // populating the visibleInformation object (initializing everything with false)
@@ -65,6 +96,30 @@ timeslots.forEach((timeslot) => {
         visibleInformation[ts][a] = false;
     });
 });
+
+// populating the dataMessageMap object
+data.tuples().forEach((tuple) => {
+    let m = tuple.atoms()[0];
+    let d = tuple.atoms()[1].toString();
+    dataMessageMap[d] = m;
+});
+
+// populating privKeyMap
+KeyPairs0.owners.tuples().forEach(x => {
+    let atoms = x.atoms();
+    let key = atoms[0].toString();
+    let owner = atoms[1].toString();
+    privKeyMap[key] = owner;
+});
+
+// populating pubKeyMap
+KeyPairs0.pairs.tuples().forEach(x => {
+    let atoms = x.atoms();
+    let private = atoms[0].toString();
+    let public = atoms[1].toString();
+    let owner = privKeyMap[private]; 
+    pubKeyMap[public] = owner;
+})
 
 /**
  * gets the names of the timeslots before the given one
@@ -176,8 +231,19 @@ function labelY() {
  */
 function labelText(m) {
     // grabbing the plaintext for this message's data
-    const pt = m.data.tuples().map(tuple => tuple.atoms()[0].plaintext.toString());
+    const pt = m.data.tuples().map(tuple => {
+        let datum = tuple.atoms()[0].plaintext.toString();
+        if (pubKeyMap[datum]) {
+            return `pubK${pubKeyMap[datum]}`;
+        } else if (privKeyMap[datum]) {
+            // TODO: would this ever happen?
+            return `privK${privKeyMap[datum]}`;
+        } else {
+            return datum;
+        }
+    });
     // TODO: more formatting (commas)
+    // TODO: pub key and priv key check
     const ptString = pt;
     return `{${ptString}}`;
 }
@@ -188,7 +254,10 @@ function labelText(m) {
  * @returns a string containing the text for the subscript
  */
 function subscriptText(m) {
-    return `${m.data.encryptionKey}`;
+    // TODO: pub key and priv key check
+    let pubKey = m.data.encryptionKey.toString();
+    let owner = pubKeyMap[pubKey];
+    return `pubK${owner}`;
 }
 
 /**
@@ -216,12 +285,58 @@ function onMouseClick(mouseevent, timeslot) {
     render();
 }
 
-function wrapText(container, startX, startY, textArray, color) {
+// check if its an encripted message, public key, or private key
+function replaceDatum(d) {
+    if (dataMessageMap[d]) {
+        let m = dataMessageMap[d];
+        return {
+            content: labelText(m),
+            subscript: subscriptText(m)
+        };
+    } else if (pubKeyMap[d]) {
+        return {
+            content: `pubK${pubKeyMap[d]}`
+        };
+    } else if (privKeyMap[d]) {
+        // TODO: would this ever happen?
+        return {
+            content: `privK${privKeyMap[d]}`
+        };
+    } else {
+        return {
+            content: d
+        };
+    }
+}
+
+function filterComplexData(textArray) {
+
+    const simple = [];
+    const complex = [];
+
+    textArray.forEach((d) => {
+
+        let replaced = replaceDatum(d);
+
+        if ('subscript' in replaced) {
+            complex.push(replaced);
+        } else {
+            simple.push(replaced.content);
+        }
+
+    });
+
+    return {simple, complex};
+}
+
+function formatText(container, startX, startY, textArray, color) {
+
+    const filtered = filterComplexData(textArray);
 
     // split the text so that there is no more than 3 items per line
     const infoPerLine = 3;
     const lineHeight = 20;
-    const numberOfLines = textArray.length / infoPerLine;
+    const numberOfLines = Math.ceil(filtered.simple.length / infoPerLine) + filtered.complex.length;
 
     let line;
     for (line = 0; line < numberOfLines; line++) {
@@ -229,10 +344,10 @@ function wrapText(container, startX, startY, textArray, color) {
         let rangeStart = line * infoPerLine;
         let rangeEnd = line * infoPerLine + infoPerLine;
 
-        const lineContents = textArray.slice(rangeStart, rangeEnd);
+        const lineContents = filtered.simple.slice(rangeStart, rangeEnd);
 
         // append the old information
-        container.append('text')
+        const text = container.append('text')
             .attr('x', startX)
             .attr('y', () => startY + (lineHeight * line))
             .style('font-family', '"Open Sans", sans-serif')
@@ -240,10 +355,30 @@ function wrapText(container, startX, startY, textArray, color) {
             .text(lineContents);
     }
 
+    let simpleLines = 0
+    if (filtered.simple.length > 0) {
+        simpleLines = line - 1;
+    }
+
+    // FOR each thing in complex, give it it's own line
+    for (line = 0; line < filtered.complex.length; line++) {
+        let currInfo = filtered.complex[line];
+        const text = container.append('text')
+            .attr('x', startX)
+            .attr('y', () => startY + (lineHeight * (simpleLines + line)))
+            .style('font-family', '"Open Sans", sans-serif')
+            .style('fill', color)
+            .text(currInfo.content);
+
+        text.append('tspan')
+            .text(currInfo.subscript)
+            .style('font-size', 12)
+            .attr('dx', 5)
+            .attr('dy', 5);
+    }
+
     return numberOfLines * lineHeight;
 }
-
-
 
 function render() {
     // clear the svg
@@ -383,13 +518,30 @@ function render() {
                     .attr('stroke', BLUE)
                     .attr('stroke-width', '3');
 
+                let textHeight = 20;
+
                 const newInfo = learnedInformation[ts][a];
-                let textHeight;
+
+                // fetch any generated information and remove it from newInfo
+                if (generatedInformation[ts] && generatedInformation[ts][a]) {
+                    const generatedInfo = generatedInformation[ts][a];
+                    generatedInfo.forEach((x) => {
+
+                        const index = newInfo.indexOf(x);
+                        if (index > -1) {
+                            newInfo.splice(index, 1);
+                        }
+                    });
+
+                    // display the generated info in green
+                    textHeight += formatText(g, boxX + 5, boxY + textHeight, generatedInfo, GREEN);
+                    textHeight += 20;
+                }
+                
                 if (newInfo) {
-                    // display the new info over multiple lines
-                    textHeight = wrapText(g, boxX + 5, boxY + 20, newInfo, RED);
-                } else {
-                    textHeight = 0;
+                    // display the new info in red
+                    textHeight += formatText(g, boxX + 5,  boxY + textHeight, newInfo, RED);
+                    textHeight += 20;
                 }
     
                 // collect the old information
@@ -401,9 +553,10 @@ function render() {
                 });
 
                 // display the old info over multiple lines
-                textHeight += wrapText(g, boxX + 5, boxY + textHeight + 40, oldInfo, BLACK);
+                textHeight += formatText(g, boxX + 5, boxY + textHeight, oldInfo, BLACK);
+                textHeight += 20;
 
-                // TODO: set boxHieight to be the max of itselft and textHeight + 20 or something
+                // TODO: set boxHeight to be the max of itself and textHeight + 20 or something ?
     
             } else {
                 // remove the group if this timeslot is not supposed to be visible
