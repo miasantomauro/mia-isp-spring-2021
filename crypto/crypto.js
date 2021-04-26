@@ -1,9 +1,9 @@
 // constants for our visualization
 const baseX = 150;
-const baseY = 150;
+const baseY = 100;
 const timeslotHeight = 80;
 const agentWidth = 300;
-let boxHeight = 110;
+let boxHeight = 130;
 const boxWidth = 200;
 const RED = '#E54B4B';
 const BLUE = '#0495C2';
@@ -336,7 +336,7 @@ function formatText(container, startX, startY, textArray, color) {
     // split the text so that there is no more than 3 items per line
     const infoPerLine = 3;
     const lineHeight = 20;
-    const numberOfLines = (filtered.simple.length / infoPerLine) + filtered.complex.length;
+    const numberOfLines = Math.ceil(filtered.simple.length / infoPerLine) + filtered.complex.length;
 
     let line;
     for (line = 0; line < numberOfLines; line++) {
@@ -355,7 +355,10 @@ function formatText(container, startX, startY, textArray, color) {
             .text(lineContents);
     }
 
-    const simpleLines = line - 1;
+    let simpleLines = 0
+    if (filtered.simple.length > 0) {
+        simpleLines = line - 1;
+    }
 
     // FOR each thing in complex, give it it's own line
     for (line = 0; line < filtered.complex.length; line++) {
@@ -515,7 +518,7 @@ function render() {
                     .attr('stroke', BLUE)
                     .attr('stroke-width', '3');
 
-                let textHeight = 0;
+                let textHeight = 20;
 
                 const newInfo = learnedInformation[ts][a];
 
@@ -530,12 +533,15 @@ function render() {
                         }
                     });
 
-                    textHeight += formatText(g, boxX + 5, boxY + 15, generatedInfo, GREEN);
+                    // display the generated info in green
+                    textHeight += formatText(g, boxX + 5, boxY + textHeight, generatedInfo, GREEN);
+                    textHeight += 20;
                 }
                 
                 if (newInfo) {
-                    // display the new info over multiple lines
-                    textHeight += formatText(g, boxX + 5,  boxY + textHeight + 30, newInfo, RED);
+                    // display the new info in red
+                    textHeight += formatText(g, boxX + 5,  boxY + textHeight, newInfo, RED);
+                    textHeight += 20;
                 }
     
                 // collect the old information
@@ -547,9 +553,10 @@ function render() {
                 });
 
                 // display the old info over multiple lines
-                textHeight += formatText(g, boxX + 5, boxY + textHeight + 45, oldInfo, BLACK);
+                textHeight += formatText(g, boxX + 5, boxY + textHeight, oldInfo, BLACK);
+                textHeight += 20;
 
-                // TODO: set boxHeight to be the max of itself and textHeight + 20 or something
+                // TODO: set boxHeight to be the max of itself and textHeight + 20 or something ?
     
             } else {
                 // remove the group if this timeslot is not supposed to be visible
