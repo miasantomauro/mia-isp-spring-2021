@@ -41,6 +41,7 @@
 (relation pairs (KeyPairs PrivateKey PublicKey))
 (relation owners (KeyPairs PrivateKey Agent))
 (relation plaintext (CipherText Datum))
+(relation generated_times (Agent Datum Timeslot))
 
 ; TODO: swap above with the below, once finalized
 ;(require "current_model.rkt") ; the base crypto modl
@@ -107,15 +108,20 @@
              #:attr tostruct (ast-enc (attribute key.tostruct) (attribute vals.tostruct))))
 
   ;  (non-orig (privk a) (privk b))
+  (struct ast-non-orig (data) #:transparent)
   (define-syntax-class nonOrigClass
     #:description "non-origination declaration"
     (pattern ((~literal non-orig)
-              data:datumClass ...)))
+              data:datumClass ...)
+             #:attr tostruct (ast-non-orig (attribute data.tostruct))))
+  
   ;  (uniq-orig n2)
+  (struct ast-uniq-orig (data) #:transparent)
   (define-syntax-class uniqOrigClass
     #:description "unique-origination declaration"
     (pattern ((~literal uniq-orig)
-              data:datumClass ...)))
+              data:datumClass ...)
+             #:attr tostruct (ast-uniq-orig (attribute data.tostruct))))
   
   ; n1, a, (pubk a), (privk a)
   (struct ast-datum (wrap value) #:transparent)
@@ -129,7 +135,8 @@
              #:attr tostruct (ast-datum #f #'x)))
 
   ; (a1 a2)
-  ; Name is from CPSA docs
+  ; Name is from CPSA docs. Bind a strand's variable name to a term
+  ;   constructed from variables of the skeleton.
   (define-syntax-class mapletClass
     #:description "maplet"
     (pattern (x1:id x2:id)
@@ -219,6 +226,7 @@
 (define-for-syntax (build-key-expression-for-event pname rname rolevar ev)
   (let* ([contents (ast-event-contents ev)]
          [key (ast-enc-key contents)]
+         ; This message was encrypted with a key; we locally have a value for whose key it is
          [local-knower (if key (format-id pname "~a_~a_~a" pname rname (ast-datum-value key)) #f)]) 
     (cond [(and key (equal? 'privk (ast-datum-wrap key)))
            ; The key belongs to someone corresponding to a variable in this strand
@@ -228,7 +236,7 @@
           [(and key (equal? 'pubk (ast-datum-wrap key)))             
            #`(join (join KeyPairs owners (join #,rolevar #,local-knower)) (join KeyPairs pairs))]
           [key
-           (raise (error (format "Message was encrypted, but not with a key: ~a" contents)))]
+           (raise (error (format "Message was encrypted, but not with a key term: ~a" contents)))]
           [else #'none])))
 
 ;      -- encrypted with public key of whoever is locally "b"
@@ -281,21 +289,123 @@
     result))
 (define-for-syntax skeleton-index (box 0))
 
+; Define a skeleton subsig for each skeleton.
 (define-syntax (defskeleton stx)
-  (syntax-parse stx [(defskeleton pname:id vars:varsClass strand:strandClass
+  (syntax-parse stx [(defskeleton pname:id vars:varsClass strands:strandClass ...
                        non-orig:nonOrigClass uniq-orig:uniqOrigClass (~optional comment:commentClass))
                      (let ([idx (unbox-and-increment skeleton-index)])
-                       (with-syntax ([parentsig (format-id #'pname "skeleton_~a_~a" #'pname idx)])
+                       (with-syntax ([skelesig (format-id #'pname "skeleton_~a_~a" #'pname idx)])                         
                        (quasisyntax/loc stx
-                         (begin
-                           ; subsig for skeleton
-                           (sig parentsig #:one) ; declare sig
-                           ; variable fields (similar to protocol case: TODO -- factor)                           
-                           #,@(build-variable-fields (attribute vars.tostruct) #'pname idx #'rolesig #:prefix "skeleton_")
-                           ; TODO: predicate body
-                           (pred #,(format-id #'pname "constrain_skeleton_~a_~a" #'pname idx) true)
-                           ))))]))
-;(pname vars strand non-orig uniq-orig comment)
+                         (begin                           
+                           (sig skelesig #:one) ; declare sig
+                           ; variable fields (similar to protocol case: TODO -- factor out shared code)                           
+                           #,@(build-variable-fields (attribute vars.tostruct) #'pname idx #'skelesig #:prefix "skeleton_")
+
+                           ; Represent each instance as an existentially quantified role strand, rather than
+                           ; saving an (unused) explicit link from the skeleton to each declared instance
+                           ; We do index strands, though, for readable skolem names
+                                                      
+                           (pred #,(format-id #'pname "constrain_skeleton_~a_~a" #'pname idx)
+                                 (and
+                                  ; Every instance (only "strand" declarations, for the moment) induces some constraints
+                                  #,@(let* ([strand-decls (attribute strands.tostruct)]
+                                            [strand-idxs (build-list (length strand-decls) (lambda (x) x))])                                      
+                                       (for/list ([this-strand-ast strand-decls]
+                                                  [strand-idx strand-idxs])                                         
+                                         ;(build-skeleton-strand-constraints
+                                         ; #'pname
+                                         ; #'skelesig
+                                         ; idx
+                                         ; this-strand-ast
+                                         ; strand-idx)
+                                         #'true
+                                         ))
+                                  ; declarations
+                                  ; wrap in list for extensibility when we support >1 decl of each type
+                                  #,@(build-non-orig-constraints (list (attribute non-orig.tostruct)))
+                                  #,@(build-uniq-orig-constraints (list (attribute uniq-orig.tostruct)))
+                                  ))))))]))
+
+; 
+(define-for-syntax (datum-ast->expr dast)
+  (cond
+    [(equal? (ast-datum-wrap dast) 'privk)
+     #'univ]
+    [(equal? (ast-datum-wrap dast) 'pubk)
+     #'univ]
+    [(not (ast-datum-wrap dast))
+     #'univ]
+    [else
+     (error (format "unrecognized datum type: ~a"))]))
+
+
+(define-for-syntax (build-non-orig-constraints asts)
+  (let ([result (flatten
+             (for/list ([non-orig asts])
+               (for/list ([decl (ast-non-orig-data non-orig)])
+                 #`(all ([a Agent])
+                        (not (originates a #,(datum-ast->expr decl))))                 
+                 )))])
+    (printf "~a~n" result)
+    result))
+                            
+;  #`(#,@(for/list ([non-orig asts])
+ ;         (for/list ([decl (ast-non-orig-data non-orig)])
+ ;           #`(all ([a Agent])
+ ;                  (not (in #,(datum-ast->expr decl)
+ ;                           (join a generated_times Timeslot))))))))
+
+; TODO
+(pred (originates str val)
+      true)
+
+
+(define-for-syntax (build-uniq-orig-constraints asts)
+  (flatten
+   (for/list ([uniq-orig asts])
+     (for/list ([decl (ast-uniq-orig-data uniq-orig)])
+       #`(lone ([a Agent])
+               (originates a #,(datum-ast->expr decl)))))))
+  
+(define-for-syntax (build-skeleton-strand-constraints pname skelesig skeleton-idx strand-ast strand-idx)  
+  (let* ([this-strand (format-id #'skelesig "~a_strand~a" skelesig strand-idx)]
+         [strand-role (ast-strand-role strand-ast)]
+         [strand-role-id (format-id #'skelesig "~a" strand-role)]
+         [strand-height (ast-strand-height strand-ast)] ; UNUSED
+         [maplet-constraints
+          ; <strand1_0>.resp_a = SkeletonNS_1.s1_a    
+          #`(#,@(for/list ([mlt (ast-strand-maplets strand-ast)])
+                  ; Note that datum-ast->expr needs to know the role whose viewpoint we're constraining
+                  ;  For instance, if the datum is "a", but we're talking about a "resp" strand, then
+                  ;  we need to use the field "resp_a" since that's what the macro expansion produces.
+                  #`(= (join #,this-strand #,(datum-ast->strand-var skelesig strand-role (first mlt)))      ; bind value TO this strand var
+                       (join #,skelesig #,(datum-ast->skeleton-var skelesig skeleton-idx (second mlt))))))]); VALUE that's this term
+    #`(some ([#,this-strand #,strand-role]) 
+            (and #,@maplet-constraints))))
+
+
+; this is just the field name for the datum in the strand
+; TODO some tangling here vs. variable creation code, should reuse
+(define-for-syntax (datum-ast->skeleton-var pt skeleton-idx datum-ast)
+  (when (ast-datum-wrap datum-ast) (error "datum-ast->skeleton-var"))
+  (format-id #'pt "~a_strand~a_" skeleton-idx (ast-datum-value datum-ast)))
+
+(define-for-syntax (datum-ast->strand-var pt strand-role datum-ast)
+  (when (ast-datum-wrap datum-ast) (error "datum-ast->strand-var"))
+  (format-id #'pt "~a_~a_~a" 0 strand-role (ast-datum-value datum-ast)))
+
+
+
+;;(defstrand resp 3 (a a) (b b) (n2 n2))
+
+;  -- ditto "b"
+;  all a: Agent | 
+;    KeyPairs.owners.(SkeletonNS_1.s1_b) not in a.generated_times.Timeslot + (Attacker.learned_times).Timeslot
+;
+;}
+
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Tests (local for now)
