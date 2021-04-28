@@ -199,7 +199,7 @@ function messageY1(m) {
  * @param {Object} m - a message prop from the forge spec
  */
 function messageY2(m) {
-    return y(m.recvTime); // TODO: 
+    return y(m.sendTime); // Y1 and Y2 are sendTime because of model change 
 }
 
 /**
