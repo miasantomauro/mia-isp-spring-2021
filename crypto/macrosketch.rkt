@@ -139,8 +139,8 @@
   ;   constructed from variables of the skeleton.
   (define-syntax-class mapletClass
     #:description "maplet"
-    (pattern (x1:id x2:id)
-             #:attr tostruct (list #'x1 #'x2)))
+    (pattern (var:id value:datumClass)
+             #:attr tostruct (list #'var (attribute value.tostruct))))
 
   ; (comment "this is a comment")
   (define-syntax-class commentClass
@@ -312,14 +312,12 @@
                                             [strand-idxs (build-list (length strand-decls) (lambda (x) x))])                                      
                                        (for/list ([this-strand-ast strand-decls]
                                                   [strand-idx strand-idxs])                                         
-                                         ;(build-skeleton-strand-constraints
-                                         ; #'pname
-                                         ; #'skelesig
-                                         ; idx
-                                         ; this-strand-ast
-                                         ; strand-idx)
-                                         #'true
-                                         ))
+                                         (build-skeleton-strand-constraints
+                                          #'pname
+                                          #'skelesig
+                                          idx
+                                          this-strand-ast
+                                          strand-idx)))                                         
                                   ; declarations
                                   ; wrap in list for extensibility when we support >1 decl of each type
                                   #,@(build-non-orig-constraints (list (attribute non-orig.tostruct)))
@@ -345,8 +343,7 @@
                (for/list ([decl (ast-non-orig-data non-orig)])
                  #`(all ([a Agent])
                         (not (originates a #,(datum-ast->expr decl))))                 
-                 )))])
-    (printf "~a~n" result)
+                 )))])    
     result))
                             
 ;  #`(#,@(for/list ([non-orig asts])
@@ -370,7 +367,7 @@
 (define-for-syntax (build-skeleton-strand-constraints pname skelesig skeleton-idx strand-ast strand-idx)  
   (let* ([this-strand (format-id #'skelesig "~a_strand~a" skelesig strand-idx)]
          [strand-role (ast-strand-role strand-ast)]
-         [strand-role-id (format-id #'skelesig "~a" strand-role)]
+         [strand-role-sig (format-id #'skelesig "~a_~a" pname strand-role)]
          [strand-height (ast-strand-height strand-ast)] ; UNUSED
          [maplet-constraints
           ; <strand1_0>.resp_a = SkeletonNS_1.s1_a    
@@ -378,40 +375,31 @@
                   ; Note that datum-ast->expr needs to know the role whose viewpoint we're constraining
                   ;  For instance, if the datum is "a", but we're talking about a "resp" strand, then
                   ;  we need to use the field "resp_a" since that's what the macro expansion produces.
-                  #`(= (join #,this-strand #,(datum-ast->strand-var skelesig strand-role (first mlt)))      ; bind value TO this strand var
-                       (join #,skelesig #,(datum-ast->skeleton-var skelesig skeleton-idx (second mlt))))))]); VALUE that's this term
-    #`(some ([#,this-strand #,strand-role]) 
+                  (when (ast-datum-wrap (second mlt))
+                    (error (format "at the moment, terms in maplets must be (unwrapped) identifiers: ~a" (second mlt))))
+                  #`(= (join #,this-strand #,(id->strand-var pname strand-role (first mlt)))  ; VARIABLE    
+                       (join #,skelesig #,(id->skeleton-var pname skeleton-idx (ast-datum-value (second mlt))))) ; VALUE                   
+                  ))])
+    #`(some ([#,this-strand #,strand-role-sig]) 
             (and #,@maplet-constraints))))
 
 
 ; this is just the field name for the datum in the strand
 ; TODO some tangling here vs. variable creation code, should reuse
-(define-for-syntax (datum-ast->skeleton-var pt skeleton-idx datum-ast)
-  (when (ast-datum-wrap datum-ast) (error "datum-ast->skeleton-var"))
-  (format-id #'pt "~a_strand~a_" skeleton-idx (ast-datum-value datum-ast)))
+;skeleton_ns_1_n2
+(define-for-syntax (id->skeleton-var pname skeleton-idx id)  
+  (format-id pname "skeleton_~a_~a_~a" pname skeleton-idx id))
 
-(define-for-syntax (datum-ast->strand-var pt strand-role datum-ast)
-  (when (ast-datum-wrap datum-ast) (error "datum-ast->strand-var"))
-  (format-id #'pt "~a_~a_~a" 0 strand-role (ast-datum-value datum-ast)))
-
-
-
-;;(defstrand resp 3 (a a) (b b) (n2 n2))
-
-;  -- ditto "b"
-;  all a: Agent | 
-;    KeyPairs.owners.(SkeletonNS_1.s1_b) not in a.generated_times.Timeslot + (Attacker.learned_times).Timeslot
-;
-;}
-
-
-
+; ns_resp_n2
+(define-for-syntax (id->strand-var pname strand-role id)  
+  (format-id pname "~a_~a_~a" pname strand-role id))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Tests (local for now)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Needham-Schroeder example from CSPA
+
 (defprotocol ns basic
   (defrole init
     (vars (a b name) (n1 n2 text))
@@ -426,7 +414,7 @@
 
 (defskeleton ns
   (vars (a b name) (n1 text))
-  (defstrand init 3 (a a) (b b) (n1 n1))
+  (defstrand init 3 (a a) (b b) (n1 n1)) 
   (non-orig (privk b) (privk a))
   (uniq-orig n1)
   (comment "Initiator point-of-view"))
@@ -443,8 +431,8 @@
 (hash-keys (forge:State-sigs forge:curr-state))
 (hash-keys (forge:State-relations forge:curr-state))
 (hash-keys (forge:State-pred-map forge:curr-state))
-(relation-typelist ns_init_a)
-(relation-typelist skeleton_ns_0_n1)
+;(relation-typelist ns_init_a)
+;(relation-typelist skeleton_ns_0_n1)
 
 ; Notes:
 ; Basic algebra has sorts (Table 10.3):
