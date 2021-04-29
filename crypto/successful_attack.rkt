@@ -363,9 +363,16 @@ all p: PrivateKey | one p.(KeyPairs.owners)
   #Key > 0
 }
 
+pred originates[a: Agent, d: Datum] { 
+
+  some m: Message | all m2: Message - m | {m2 in sendTime.(Timeslot - m.*sendTime) and m.sender = a and m2.sender = a} implies {d in m and d not in m2}
+
+ }
+
 
 -- 2 publickey, 3 ciphertext, 3 agent
 -- Sigs that we have: Datum, Key, PrivateKey, PublicKey, SymmetricKey, Agent, Attacker, Ciphertext, Text, Message, Timeslot, KeyPairs
+
 
 run {
   temporary
