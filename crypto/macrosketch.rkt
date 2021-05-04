@@ -307,7 +307,7 @@
   (match t    
     [(ast-text val)
      ; It's just an identifier; resolve via looking it up in the strand's variables
-     (id->strand-var pname strand-role val)]    
+     #`(join #,this-strand-var #,(id->strand-var pname strand-role val))]
     [(ast-key owner ktype)
      ; It's the key of an identifier; resolve and wrap (owner will be either singleton or 2-ele list)
      ; The key belongs to someone corresponding to a variable in this strand
