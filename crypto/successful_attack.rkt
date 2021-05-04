@@ -363,10 +363,36 @@ all p: PrivateKey | one p.(KeyPairs.owners)
   #Key > 0
 }
 
-pred originates[a: Agent, d: Datum] { 
+fun subterm[supers: set Datum]: set Datum {
+  -- VITAL: if you add a new subterm relation, needs to be added here, too!
+  supers +
+  supers.^(plaintext) -- union on new subterm relations inside parens
+}
 
-  some m: Message | all m2: Message - m | {m2 in sendTime.(Timeslot - m.*sendTime) and m.sender = a and m2.sender = a} implies {d in m and d not in m2}
+-- Differs slightly in that a is a strand, not a node
+pred originates[a: Agent, d: Datum] {
 
+  -- unsigned term t originates on n in N iff
+  --   term(n) is positive and
+  --   t subterm of term(n) and
+  --   whenever n' precedes n on the same strand, t is not subterm of n'
+
+  some m: sender.a | { -- messages sent by a (positive term)     
+      d in subterm[m.data] -- d is a sub-term of m     
+      all m2: (sender.a + receiver.a) - m | { -- everything else on the strand
+          -- ASSUME: messages are sent/received in same timeslot
+          {m2.sendTime in m.sendTime.^(~(next))}
+          implies          
+          {d not in subterm[m2.data]}
+      }
+  }
+  
+/*
+  some m: Message |
+      all m2: Message - m | {m2 in sendTime.(Timeslot - m.*sendTime) and m.sender = a and m2.sender = a}
+      implies
+      {d in m and d not in m2}
+*/
  }
 
 
