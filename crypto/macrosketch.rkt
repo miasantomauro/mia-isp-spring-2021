@@ -8,7 +8,8 @@
 ; At the moment, we have prototype support for the "basic" algebra
 
 (require syntax/parse syntax/parse/define)
-(require (for-syntax (only-in racket take last flatten drop-right first second or/c define/contract listof [-> -->]) 
+(require (for-syntax (only-in racket take last flatten drop-right first second third filter-map
+                              or/c define/contract listof [-> -->]) 
                      racket/match
                      racket/syntax))
 
@@ -53,11 +54,11 @@
   ; (cat t1 ...) // list constructor (may be implicit, as in enc below)
   ; (enc t1 ...) // ciphertext constructor
   
-  (struct ast-ground (value) #:transparent)
-  (define-syntax-class groundClass
-    #:description "ground value or variable (may be of sort text, name, or data)"
+  (struct ast-text (value) #:transparent)
+  (define-syntax-class textClass
+    #:description "ground text value or variable (may be of sort text, name, or data)"
     (pattern x:id
-             #:attr tostruct (ast-ground #'x)))
+             #:attr tostruct (ast-text #'x)))
 
   (struct ast-key (value wrap) #:transparent)
   (define-syntax-class keyClass
@@ -85,7 +86,7 @@
 
   (define-syntax-class termClass
     #:description "term"
-    (pattern t:groundClass
+    (pattern t:textClass
              #:attr tostruct (attribute t.tostruct))
     (pattern t:keyClass
              #:attr tostruct (attribute t.tostruct))
@@ -93,20 +94,25 @@
              #:attr tostruct (attribute t.tostruct))
     (pattern t:catClass
              #:attr tostruct (attribute t.tostruct))) 
-  
+
   ; Flatten explicit concatenations
   ; e.g., (cat (cat a b) (cat n1 n2)) would be (cat a b n1 n2)
   ; e.g., (enc (cat a b c) (ltk a b)) would be (enc a b c (ltk a b))
-  (define term/c (or/c ast-ground? ast-key? ast-enc? ast-cat?))
+  (define term/c (or/c ast-text? ast-key? ast-enc? ast-cat?))
   (define/contract (de-cat ast-list)
     (--> (listof term/c) (listof term/c)) ; note rename from -> to avoid clash
     (flatten
      (for/list ([t ast-list])
        (match t
-         [(ast-ground _) t]
+         [(ast-text _) t]
          [(ast-key _ _) t]
          [(ast-enc subterms k) (ast-enc (de-cat subterms) k)]
          [(ast-cat subterms) subterms]))))
+
+  (define/contract (is-ground? t)
+    (--> term/c boolean?)
+    (or (ast-key? t) (ast-text? t)))
+  
   
   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   
@@ -248,9 +254,6 @@
          ;   <expr for enc ...>.encryptionKey = <expr for (privk b)>
          ;   etc.
 
-         ;;;;;
-         ; But wait, isn't the context the caller's responsibility?
-         ; depends on if we're building from above or below...
          ; we can build a, (pubk a) ... from below: who is "a" locally? etc.
          ; but (enc ...) needs a "some"; there's no canonical term generation!
          ; Suppose we have a nested enc. Then "outer.plaintext" is context:
@@ -269,23 +272,26 @@
   (let* ([term-exprs-and-constraints
           (for/list ([a-term subterms])                                        
             (let ([term-expr (datum-ast->expr this-strand pname rname a-term)])
-              ; For each subterm, produce (expr, constraint) pair.
+              ; For each subterm, produce (astnode, expr, constraint) pair.
               ; if not a ground term, the expr will be an identifier to use as a quant variable
-              (list term-expr (build-term-constraints pname rname this-strand a-term term-expr))))]
-         [term-exprs (map first term-exprs-and-constraints)]
-         [term-vars (filter identifier? term-exprs)])  
+              (list a-term term-expr (build-term-constraints pname rname this-strand a-term term-expr))))]
+         ; Include ALL terms in the equality below, even ground terms
+         [term-exprs (map second term-exprs-and-constraints)]
+         ; Only quantify when needed (non-ground AST nodes)
+         [term-vars (filter-map (lambda (pr) (if (is-ground? (first pr)) #f (second pr)))
+                                term-exprs-and-constraints)])  
     #`(some #,(map (lambda (q) #`[#,q (join #,parentname #,fieldname)]) term-vars)
             (and
              (= (join #,parentname #,fieldname) ; Subterm field contains these exactly
                 #,(if (> (length term-exprs) 1)
                       #`(+ #,@term-exprs)
                       #`#,(first term-exprs))) 
-             #,@(map second term-exprs-and-constraints))))) ; which have these shapes and relationships
+             #,@(map third term-exprs-and-constraints))))) ; which have these shapes and relationships
 
-(define-for-syntax (build-term-constraints pname rname this-strand a-term term-expr)
+(define-for-syntax (build-term-constraints pname rname this-strand a-term term-expr)  
   (match a-term
-     [(ast-ground val)     
-      #'true]    
+    [(ast-text val)     
+     #'true]    
     [(ast-key owner ktype)
      #'true]
     [(ast-enc subterms k)     
@@ -299,7 +305,7 @@
 ; use (id->strand-var pname strand-role id)  
 (define-for-syntax (datum-ast->expr this-strand-var pname strand-role t)  
   (match t    
-    [(ast-ground val)
+    [(ast-text val)
      ; It's just an identifier; resolve via looking it up in the strand's variables
      (id->strand-var pname strand-role val)]    
     [(ast-key owner ktype)
@@ -317,7 +323,7 @@
           #`(join KeyPairs ltks (join #,this-strand-var #,local-field))]))]
     [(ast-enc subterms k)
      ; Manufacture a fresh variable id
-     #`#,(format-id pname "sub~a" (gensym))
+     #`#,(format-id pname "enc~a" (gensym))
      ]
     [(ast-cat subterms)
      (error (format "unexpected cat in datum-sat->expr: ~a" t))]))
