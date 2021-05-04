@@ -5,20 +5,12 @@
 ;   Tim and Abby (Spring 2021)
 
 ;https://hackage.haskell.org/package/cpsa-3.3.2/src/doc/cpsamanual.pdf
-; At the moment, we have prototype support for the "basic" algebra, using only
-;   asymmetric keys. 
+; At the moment, we have prototype support for the "basic" algebra
 
-
-; Comments from Ben for integration with prototype:
-; each role is getting parsed twice (with defroleClass); make roleforge be a function and have defprotocol do more work --- unpacking things from each of the roles
-; could kill the flatten with the in-value trick: (for*/list ((decls ....) (type (in-value (last ....))) (varid ....)) ....)
-; the take could be drop-right
-; for order-independence:
-;    use the seq-no-order package https://docs.racket-lang.org/seq-no-order/index.html
-
-(require (for-syntax racket/syntax))
 (require syntax/parse syntax/parse/define)
-(require (for-syntax (only-in racket take last flatten drop-right first second)))
+(require (for-syntax (only-in racket take last flatten drop-right first second or/c define/contract listof [-> -->]) 
+                     racket/match
+                     racket/syntax))
 
 
 ; For debugging speed, don't import the full spec yet
@@ -52,6 +44,72 @@
 ;  Note that the AST structs exist at syntax time, because they are used only to generate Forge declarations at syntax time.
 (begin-for-syntax
 
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ; Start with a rough approximation of CPSA's term grammar
+
+  ;; Structure of a term in CPSA basic grammar (note "mesg" sort can be any term)
+  ; ground value (text, data, name)
+  ; keys look like: (ltk a b), (pubk a), (privk a)
+  ; (cat t1 ...) // list constructor (may be implicit, as in enc below)
+  ; (enc t1 ...) // ciphertext constructor
+  
+  (struct ast-ground (value) #:transparent)
+  (define-syntax-class groundClass
+    #:description "ground value or variable (may be of sort text, name, or data)"
+    (pattern x:id
+             #:attr tostruct (ast-ground #'x)))
+
+  (struct ast-key (value wrap) #:transparent)
+  (define-syntax-class keyClass
+    #:description "public, private, or symmetric long-term key"
+    (pattern ((~literal privk) x:id)
+             #:attr tostruct (ast-key #'x 'privk))
+    (pattern ((~literal pubk) x:id)
+             #:attr tostruct (ast-key #'x 'pubk))
+    (pattern ((~literal ltk) x:id y:id)
+             #:attr tostruct (ast-key #'(x y) 'ltk)))
+            
+  (struct ast-enc (values key) #:transparent)
+  (define-syntax-class encClass
+    #:description "encryption term"    
+    (pattern ((~literal enc)
+              vals:termClass ...
+              key:keyClass)
+             #:attr tostruct (ast-enc (de-cat (attribute vals.tostruct)) (attribute key.tostruct))))
+
+  (struct ast-cat (values) #:transparent)
+  (define-syntax-class catClass
+    #:description "explicit concatenation"
+    (pattern ((~literal cat) ds:termClass ...)
+             #:attr tostruct (ast-cat (de-cat (attribute ds.tostruct)))))
+
+  (define-syntax-class termClass
+    #:description "term"
+    (pattern t:groundClass
+             #:attr tostruct (attribute t.tostruct))
+    (pattern t:keyClass
+             #:attr tostruct (attribute t.tostruct))
+    (pattern t:encClass
+             #:attr tostruct (attribute t.tostruct))
+    (pattern t:catClass
+             #:attr tostruct (attribute t.tostruct))) 
+  
+  ; Flatten explicit concatenations
+  ; e.g., (cat (cat a b) (cat n1 n2)) would be (cat a b n1 n2)
+  ; e.g., (enc (cat a b c) (ltk a b)) would be (enc a b c (ltk a b))
+  (define term/c (or/c ast-ground? ast-key? ast-enc? ast-cat?))
+  (define/contract (de-cat ast-list)
+    (--> (listof term/c) (listof term/c)) ; note rename from -> to avoid clash
+    (flatten
+     (for/list ([t ast-list])
+       (match t
+         [(ast-ground _) t]
+         [(ast-key _ _) t]
+         [(ast-enc subterms k) (ast-enc (de-cat subterms) k)]
+         [(ast-cat subterms) subterms]))))
+  
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  
   ;(defrole init
   ;    (vars (a b name) (n1 n2 text))
   ;    (trace (send (enc n1 a (pubk b)))
@@ -64,8 +122,7 @@
               rname:id
               vars:varsClass
               trace:traceClass)                          
-             #:attr tostruct (ast-role #'rname (attribute vars.tostruct) (attribute trace.tostruct))
-             ))
+             #:attr tostruct (ast-role #'rname (attribute vars.tostruct) (attribute trace.tostruct))))
   
 ;  (vars (a b name) (n1 n2 text))
   (define-syntax-class varsGrouping
@@ -94,25 +151,18 @@
   (struct ast-event (orig type contents) #:transparent)
   (define-syntax-class eventClass
     #:description "Event definition"
-    (pattern ((~literal send) enc:encClass)
-             #:attr tostruct (ast-event #'this-syntax 'send (attribute enc.tostruct)))
-    (pattern ((~literal recv) enc:encClass)
-             #:attr tostruct (ast-event #'this-syntax 'recv (attribute enc.tostruct))))
-  
-  (struct ast-enc (key vals) #:transparent)
-  (define-syntax-class encClass
-    #:description "encrypted message"
-    (pattern ((~literal enc)
-              vals:datumClass ...
-              key:datumClass)
-             #:attr tostruct (ast-enc (attribute key.tostruct) (attribute vals.tostruct))))
+    (pattern ((~literal send) vals:termClass ...)             
+             #:attr tostruct (ast-event #'this-syntax 'send (de-cat (attribute vals.tostruct))))
+    (pattern ((~literal recv) vals:termClass ...)
+             #:attr tostruct (ast-event #'this-syntax 'recv (de-cat (attribute vals.tostruct)))))
+ 
 
   ;  (non-orig (privk a) (privk b))
   (struct ast-non-orig (data) #:transparent)
   (define-syntax-class nonOrigClass
     #:description "non-origination declaration"
     (pattern ((~literal non-orig)
-              data:datumClass ...)
+              data:termClass ...)
              #:attr tostruct (ast-non-orig (attribute data.tostruct))))
   
   ;  (uniq-orig n2)
@@ -120,27 +170,17 @@
   (define-syntax-class uniqOrigClass
     #:description "unique-origination declaration"
     (pattern ((~literal uniq-orig)
-              data:datumClass ...)
+              data:termClass ...)
              #:attr tostruct (ast-uniq-orig (attribute data.tostruct))))
-  
-  ; n1, a, (pubk a), (privk a)
-  (struct ast-datum (wrap value) #:transparent)
-  (define-syntax-class datumClass
-    #:description "datum definition (an identifier, a public key, or a private key)"
-    (pattern ((~literal privk) x:id)
-             #:attr tostruct (ast-datum 'privk #'x))
-    (pattern ((~literal pubk) x:id)
-             #:attr tostruct (ast-datum 'pubk #'x))
-    (pattern x:id
-             #:attr tostruct (ast-datum #f #'x)))
 
   ; (a1 a2)
   ; Name is from CPSA docs. Bind a strand's variable name to a term
   ;   constructed from variables of the skeleton.
+  (struct ast-maplet (var value))
   (define-syntax-class mapletClass
     #:description "maplet"
-    (pattern (var:id value:datumClass)
-             #:attr tostruct (list #'var (attribute value.tostruct))))
+    (pattern (var:id value:termClass)
+             #:attr tostruct (ast-maplet #'var (attribute value.tostruct))))
 
   ; (comment "this is a comment")
   (define-syntax-class commentClass
@@ -184,45 +224,85 @@
          #,(format-id name1 "~a~a_~a_~a" prefix name1 name2 #'varid)
          (#,parent type)))))
 
-(define-for-syntax (build-event-assertion pname rname rolevar ev msg prev-msg)
+(define-for-syntax (build-event-assertion pname rname this-strand ev msg prev-msg)
   ;(printf "ast-event-contents ev: ~a~n" (ast-event-contents ev))
   ; First, assert temporal ordering on this message variable; msg happens strictly after prev-msg unless no prev-msg
   #`(and #,(if prev-msg
                #`(in (join #,msg sendTime) (join #,prev-msg (^ sendTime)))
                #`true)
-         ; one content (TODO: is this safe to assert generally?)
-         ;      one m0.data
-         (one (join #,msg data))
-         ; Then assert event constraints
+
+         ; Assert event constraints
          ; Sender or receiver
-         ;      m0.receiver = resp ; or sender, depending on type of event
-         #,(if (equal? (ast-event-type ev) 'send)
-               #`(= #,rolevar (join #,msg receiver))
-               #`(= #,rolevar (join #,msg sender)))
-
+         ;      m0.receiver = resp ; or sender, depending on type of event         
          #,(cond [(equal? (ast-event-type ev) 'send)
-                  #`(= #,rolevar (join #,msg sender))]
+                  #`(= #,this-strand (join #,msg sender))]
                  [(equal? (ast-event-type ev) 'recv)
-                  #`(= #,rolevar (join #,msg receiver))]
+                  #`(= #,this-strand (join #,msg receiver))]
                  [else (error (format "bad event type: ~a" (ast-event-type ev)))])
-         
-         ; What's in the message? Order independent
-         ; If encrypted vs. non-encrypted
 
-         ; ASSUME: vals are just local variables TODO
-         ; TODO: but in general, we'd need to descend arbitrarily deep to say what the plaintext is
-         ;  m0.data.plaintext = resp.resp_a + resp.resp_n1
-         #,(let ([args (for/list ([a-datum (ast-enc-vals (ast-event-contents ev))])
-                         #`(join #,rolevar #,(format-id pname "~a_~a_~a" pname rname (ast-datum-value a-datum))))])
-             #`(= (join #,msg data plaintext)
-                  #,(if (> (length args) 1)
-                        #`(+ #,@args)         ; union of all plaintext's contents
-                        #`#,(first args))))   ; just a singleton content
+         ; What's in the message?
+         ; E.g., (send a (enc b (enc c (pubk a)) (privk b)))
+         ; (1) Need to say what the contents of the message are:
+         ;   msg.data = (+ <expr for a> <expr for enc ...>)
+         ; (2) structural constraints on those contents, built recursively
+         ;   <expr for enc ...>.encryptionKey = <expr for (privk b)>
+         ;   etc.
+
+         ;;;;;
+         ; But wait, isn't the context the caller's responsibility?
+         ; depends on if we're building from above or below...
+         ; we can build a, (pubk a) ... from below: who is "a" locally? etc.
+         ; but (enc ...) needs a "some"; there's no canonical term generation!
+         ; Suppose we have a nested enc. Then "outer.plaintext" is context:
+         ; some sub1_outer: Ciphertext & outer.plaintext | { }
+
+         ; The somes won't get added for non-constructor terms, right?
+         ; ** Create var names in parent, so that we can say their union = the contents **
          
-         ; What's the encryption key, if any?
-         (= (join #,msg data encryptionKey)
-            #,(build-key-expression-for-event pname rname rolevar ev))))
- 
+         ;;;;;;
+         
+         ; Assume that values are just strand-local.
+         ; TODO: prevent match if unable to read within a term, unless mesg type                  
+         #,(let* ([term-exprs-and-constraints
+                   (for/list ([a-term (ast-event-contents ev)])                                        
+                     (let ([term-expr (datum-ast->expr this-strand pname rname a-term)])
+                       ; For each subterm, produce (expr, constraint) pair.
+                       ; if not a ground term, the expr will be an identifier to use as a quant variable
+                       (list term-expr (build-term-constraints this-strand a-term term-expr))))]
+                  [term-exprs (map first term-exprs-and-constraints)]
+                  [term-vars (filter identifier? term-exprs)])  
+             #`(some #,(map (lambda (q) #`[#,q (join #,msg data)]) term-vars)
+                     (and
+                      (= (join #,msg data) (+ #,@term-exprs)) ; Message contains these exactly
+                      #,@(map second term-exprs-and-constraints)))))) ; which have these shapes and relationships
+
+; Take an AST struct and produce the corresponding expression relative to given context
+; use (id->strand-var pname strand-role id)  
+(define-for-syntax (datum-ast->expr this-strand-var pname strand-role t)  
+  (match t    
+    [(ast-ground val)
+     ; It's just an identifier; resolve via looking it up in the strand's variables
+     (id->strand-var pname strand-role val)]    
+    [(ast-key owner ktype)
+     ; It's the key of an identifier; resolve and wrap (owner will be either singleton or 2-ele list)
+     ; The key belongs to someone corresponding to a variable in this strand
+     ; If a private key, we just look them up in owners
+     ; If a public key, we need to follow the private key into the pairs relation
+     (let ([local-field (id->strand-var pname strand-role val)])
+       (match ktype
+         ['privk
+          #`(join KeyPairs owners (join #,this-strand-var #,local-field))]
+         ['pubk
+          #`(join (join KeyPairs owners (join #,this-strand-var #,local-field)) (join KeyPairs pairs))]
+         ['ltk
+          #`(join KeyPairs ltks (join #,this-strand-var #,local-field))]))]
+    [(ast-enc subterms k)
+     ; Manufacture a fresh variable id
+     #`#,(format-id pname "sub~a" (gensym))
+     ]
+    [(ast-cat subterms)
+     (error (format "unexpected cat in datum-sat->expr: ~a" t))]))
+
 (define-for-syntax (build-key-expression-for-event pname rname rolevar ev)
   (let* ([contents (ast-event-contents ev)]
          [key (ast-enc-key contents)]
@@ -270,8 +350,10 @@
 ; Main macro for defprotocol declarations
 (define-syntax (defprotocol stx)
   (syntax-parse stx [(defprotocol pname:id ptype:id roles:defroleClass ...)
-                     (quasisyntax/loc stx
-                       (begin (roleforge pname roles) ...))]))
+                     (quasisyntax/loc stx #,(attribute roles.tostruct))
+                     ;(quasisyntax/loc stx
+                     ;  (begin (roleforge pname roles) ...))
+                     ]))
 
 ;(defskeleton ns
 ;  (vars (a b name) (n2 text))
@@ -289,99 +371,87 @@
     result))
 (define-for-syntax skeleton-index (box 0))
 
-; Define a skeleton subsig for each skeleton.
-(define-syntax (defskeleton stx)
-  (syntax-parse stx [(defskeleton pname:id vars:varsClass strands:strandClass ...
-                       non-orig:nonOrigClass uniq-orig:uniqOrigClass (~optional comment:commentClass))
-                     (let ([idx (unbox-and-increment skeleton-index)])
-                       (with-syntax ([skelesig (format-id #'pname "skeleton_~a_~a" #'pname idx)])                         
-                       (quasisyntax/loc stx
-                         (begin                           
-                           (sig skelesig #:one) ; declare sig
-                           ; variable fields (similar to protocol case: TODO -- factor out shared code)                           
-                           #,@(build-variable-fields (attribute vars.tostruct) #'pname idx #'skelesig #:prefix "skeleton_")
-
-                           ; Represent each instance as an existentially quantified role strand, rather than
-                           ; saving an (unused) explicit link from the skeleton to each declared instance
-                           ; We do index strands, though, for readable skolem names
-                                                      
-                           (pred #,(format-id #'pname "constrain_skeleton_~a_~a" #'pname idx)
-                                 (and
-                                  ; Every instance (only "strand" declarations, for the moment) induces some constraints
-                                  #,@(let* ([strand-decls (attribute strands.tostruct)]
-                                            [strand-idxs (build-list (length strand-decls) (lambda (x) x))])                                      
-                                       (for/list ([this-strand-ast strand-decls]
-                                                  [strand-idx strand-idxs])                                         
-                                         (build-skeleton-strand-constraints
-                                          #'pname
-                                          #'skelesig
-                                          idx
-                                          this-strand-ast
-                                          strand-idx)))                                         
-                                  ; declarations
-                                  ; wrap in list for extensibility when we support >1 decl of each type
-                                  #,@(build-non-orig-constraints (list (attribute non-orig.tostruct)))
-                                  #,@(build-uniq-orig-constraints (list (attribute uniq-orig.tostruct)))
-                                  ))))))]))
-
-; 
-(define-for-syntax (datum-ast->expr dast)
-  (cond
-    [(equal? (ast-datum-wrap dast) 'privk)
-     #'univ]
-    [(equal? (ast-datum-wrap dast) 'pubk)
-     #'univ]
-    [(not (ast-datum-wrap dast))
-     #'univ]
-    [else
-     (error (format "unrecognized datum type: ~a"))]))
-
-
-(define-for-syntax (build-non-orig-constraints asts)
-  (let ([result (flatten
-             (for/list ([non-orig asts])
-               (for/list ([decl (ast-non-orig-data non-orig)])
-                 #`(all ([a Agent])
-                        (not (originates a #,(datum-ast->expr decl))))                 
-                 )))])    
-    result))
-                            
-;  #`(#,@(for/list ([non-orig asts])
- ;         (for/list ([decl (ast-non-orig-data non-orig)])
- ;           #`(all ([a Agent])
- ;                  (not (in #,(datum-ast->expr decl)
- ;                           (join a generated_times Timeslot))))))))
-
-; TODO
-(pred (originates str val)
-      true)
-
-
-(define-for-syntax (build-uniq-orig-constraints asts)
-  (flatten
-   (for/list ([uniq-orig asts])
-     (for/list ([decl (ast-uniq-orig-data uniq-orig)])
-       #`(lone ([a Agent])
-               (originates a #,(datum-ast->expr decl)))))))
-  
-(define-for-syntax (build-skeleton-strand-constraints pname skelesig skeleton-idx strand-ast strand-idx)  
-  (let* ([this-strand (format-id #'skelesig "~a_strand~a" skelesig strand-idx)]
-         [strand-role (ast-strand-role strand-ast)]
-         [strand-role-sig (format-id #'skelesig "~a_~a" pname strand-role)]
-         [strand-height (ast-strand-height strand-ast)] ; UNUSED
-         [maplet-constraints
-          ; <strand1_0>.resp_a = SkeletonNS_1.s1_a    
-          #`(#,@(for/list ([mlt (ast-strand-maplets strand-ast)])
-                  ; Note that datum-ast->expr needs to know the role whose viewpoint we're constraining
-                  ;  For instance, if the datum is "a", but we're talking about a "resp" strand, then
-                  ;  we need to use the field "resp_a" since that's what the macro expansion produces.
-                  (when (ast-datum-wrap (second mlt))
-                    (error (format "at the moment, terms in maplets must be (unwrapped) identifiers: ~a" (second mlt))))
-                  #`(= (join #,this-strand #,(id->strand-var pname strand-role (first mlt)))  ; VARIABLE    
-                       (join #,skelesig #,(id->skeleton-var pname skeleton-idx (ast-datum-value (second mlt))))) ; VALUE                   
-                  ))])
-    #`(some ([#,this-strand #,strand-role-sig]) 
-            (and #,@maplet-constraints))))
+;; Define a skeleton subsig for each skeleton.
+;(define-syntax (defskeleton stx)
+;  (syntax-parse stx [(defskeleton pname:id vars:varsClass strands:strandClass ...
+;                       non-orig:nonOrigClass uniq-orig:uniqOrigClass (~optional comment:commentClass))
+;                     (let ([idx (unbox-and-increment skeleton-index)])
+;                       (with-syntax ([skelesig (format-id #'pname "skeleton_~a_~a" #'pname idx)])                         
+;                       (quasisyntax/loc stx
+;                         (begin                           
+;                           (sig skelesig #:one) ; declare sig
+;                           ; variable fields (similar to protocol case: TODO -- factor out shared code)                           
+;                           #,@(build-variable-fields (attribute vars.tostruct) #'pname idx #'skelesig #:prefix "skeleton_")
+;
+;                           ; Represent each instance as an existentially quantified role strand, rather than
+;                           ; saving an (unused) explicit link from the skeleton to each declared instance
+;                           ; We do index strands, though, for readable skolem names
+;                                                      
+;                           (pred #,(format-id #'pname "constrain_skeleton_~a_~a" #'pname idx)
+;                                 (and
+;                                  ; Every instance (only "strand" declarations, for the moment) induces some constraints
+;                                  #,@(let* ([strand-decls (attribute strands.tostruct)]
+;                                            [strand-idxs (build-list (length strand-decls) (lambda (x) x))])                                      
+;                                       (for/list ([this-strand-ast strand-decls]
+;                                                  [strand-idx strand-idxs])                                         
+;                                         (build-skeleton-strand-constraints
+;                                          #'pname
+;                                          #'skelesig
+;                                          idx
+;                                          this-strand-ast
+;                                          strand-idx)))                                         
+;                                  ; declarations
+;                                  ; wrap in list for extensibility when we support >1 decl of each type
+;                                  #,@(build-non-orig-constraints (list (attribute non-orig.tostruct)))
+;                                  #,@(build-uniq-orig-constraints (list (attribute uniq-orig.tostruct)))
+;                                  ))))))]))
+;
+;
+;(define-for-syntax (build-non-orig-constraints asts)
+;  (let ([result (flatten
+;             (for/list ([non-orig asts])
+;               (for/list ([decl (ast-non-orig-data non-orig)])
+;                 #`(all ([a Agent])
+;                        (not (originates a #,(datum-ast->expr decl))))                 
+;                 )))])    
+;    result))
+;                            
+;;  #`(#,@(for/list ([non-orig asts])
+; ;         (for/list ([decl (ast-non-orig-data non-orig)])
+; ;           #`(all ([a Agent])
+; ;                  (not (in #,(datum-ast->expr decl)
+; ;                           (join a generated_times Timeslot))))))))
+;
+;; TODO: import
+;(pred (originates str val)
+;      true)
+;
+;
+;(define-for-syntax (build-uniq-orig-constraints asts)
+;  (flatten
+;   (for/list ([uniq-orig asts])
+;     (for/list ([decl (ast-uniq-orig-data uniq-orig)])
+;       #`(lone ([a Agent])
+;               (originates a #,(datum-ast->expr decl)))))))
+;  
+;(define-for-syntax (build-skeleton-strand-constraints pname skelesig skeleton-idx strand-ast strand-idx)  
+;  (let* ([this-strand (format-id #'skelesig "~a_strand~a" skelesig strand-idx)]
+;         [strand-role (ast-strand-role strand-ast)]
+;         [strand-role-sig (format-id #'skelesig "~a_~a" pname strand-role)]
+;         [strand-height (ast-strand-height strand-ast)] ; UNUSED
+;         [maplet-constraints
+;          ; <strand1_0>.resp_a = SkeletonNS_1.s1_a    
+;          #`(#,@(for/list ([mlt (ast-strand-maplets strand-ast)])
+;                  ; Note that datum-ast->expr needs to know the role whose viewpoint we're constraining
+;                  ;  For instance, if the datum is "a", but we're talking about a "resp" strand, then
+;                  ;  we need to use the field "resp_a" since that's what the macro expansion produces.
+;                  (when (ast-datum-wrap (second mlt))
+;                    (error (format "at the moment, terms in maplets must be (unwrapped) identifiers: ~a" (second mlt))))
+;                  #`(= (join #,this-strand #,(id->strand-var pname strand-role (first mlt)))  ; VARIABLE    
+;                       (join #,skelesig #,(id->skeleton-var pname skeleton-idx (ast-datum-value (second mlt))))) ; VALUE                   
+;                  ))])
+;    #`(some ([#,this-strand #,strand-role-sig]) 
+;            (and #,@maplet-constraints))))
 
 
 ; this is just the field name for the datum in the strand
@@ -412,19 +482,19 @@
            (send (enc n1 n2 (pubk a)))
            (recv (enc n2 (pubk b))))))
 
-(defskeleton ns
-  (vars (a b name) (n1 text))
-  (defstrand init 3 (a a) (b b) (n1 n1)) 
-  (non-orig (privk b) (privk a))
-  (uniq-orig n1)
-  (comment "Initiator point-of-view"))
-
-(defskeleton ns
-  (vars (a b name) (n2 text))
-  (defstrand resp 3 (a a) (b b) (n2 n2))
-  (non-orig (privk a) (privk b))
-  (uniq-orig n2)
-  (comment "Responder point-of-view"))
+;(defskeleton ns
+;  (vars (a b name) (n1 text))
+;  (defstrand init 3 (a a) (b b) (n1 n1)) 
+;  (non-orig (privk b) (privk a))
+;  (uniq-orig n1)
+;  (comment "Initiator point-of-view"))
+;
+;(defskeleton ns
+;  (vars (a b name) (n2 text))
+;  (defstrand resp 3 (a a) (b b) (n2 n2))
+;  (non-orig (privk a) (privk b))
+;  (uniq-orig n2)
+;  (comment "Responder point-of-view"))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Confirm
@@ -438,7 +508,37 @@
 ; Basic algebra has sorts (Table 10.3):
 ;   text|data|name|tag|skey|akey|mesg
 ;     skey and akey are symmetric and asymmetric keys
-;   data vs text: page 21 says they are interchangeable, but disjoint
-;     "both are available for cases where an analyst may wish to describe
-;      a protocol in which two types of simple values exist that cannot be
-;      confused for each other."
+;     data vs text: page 21 says they are interchangeable, but disjoint
+;       "both are available for cases where an analyst may wish to describe
+;        a protocol in which two types of simple values exist that cannot be
+;        confused for each other."
+;     mesg: sort of messages, which can stand in for any value 
+
+
+
+;
+;(defprotocol or basic
+;  (defrole init (vars (a b s name) (na text) (k skey) (m text))
+;    (trace
+;     (send (cat m a b (enc na m a b (ltk a s))))
+;     (recv (cat m (enc na k (ltk a s))))))
+;  (defrole resp
+;    (vars (a b s name) (nb text) (k skey) (m text) (x y mesg))
+;    (trace
+;     (recv (cat m a b x))
+;     (send (cat m a b x (enc nb m a b (ltk b s))))
+;     (recv (cat m y (enc nb k (ltk b s))))
+;     (send y)))
+;  (defrole serv (vars (a b s name) (na nb text) (k skey) (m text))
+;    (trace
+;     (recv (cat m a b (enc na m a b (ltk a s))
+;		(enc nb m a b (ltk b s))))
+;     (send (cat m (enc na k (ltk a s)) (enc nb k (ltk b s)))))
+;    (uniq-orig k)))
+;
+;(defskeleton or
+;  (vars (nb text) (s a b name))
+;  (defstrand resp 4 (a a) (b b) (s s) (nb nb))
+;  (non-orig (ltk a s) (ltk b s))
+;  (uniq-orig nb))
+
