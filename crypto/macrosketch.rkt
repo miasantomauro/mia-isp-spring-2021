@@ -260,21 +260,40 @@
          ; ** Create var names in parent, so that we can say their union = the contents **
          
          ;;;;;;
-         
-         ; Assume that values are just strand-local.
-         ; TODO: prevent match if unable to read within a term, unless mesg type                  
-         #,(let* ([term-exprs-and-constraints
-                   (for/list ([a-term (ast-event-contents ev)])                                        
-                     (let ([term-expr (datum-ast->expr this-strand pname rname a-term)])
-                       ; For each subterm, produce (expr, constraint) pair.
-                       ; if not a ground term, the expr will be an identifier to use as a quant variable
-                       (list term-expr (build-term-constraints this-strand a-term term-expr))))]
-                  [term-exprs (map first term-exprs-and-constraints)]
-                  [term-vars (filter identifier? term-exprs)])  
-             #`(some #,(map (lambda (q) #`[#,q (join #,msg data)]) term-vars)
-                     (and
-                      (= (join #,msg data) (+ #,@term-exprs)) ; Message contains these exactly
-                      #,@(map second term-exprs-and-constraints)))))) ; which have these shapes and relationships
+                  
+         #,(build-subterm-list-constraints pname rname msg #'data this-strand (ast-event-contents ev))))
+
+; Assume that values are just strand-local.
+; TODO: prevent match if unable to read within a term, unless mesg type
+(define-for-syntax (build-subterm-list-constraints pname rname parentname fieldname this-strand subterms)
+  (let* ([term-exprs-and-constraints
+          (for/list ([a-term subterms])                                        
+            (let ([term-expr (datum-ast->expr this-strand pname rname a-term)])
+              ; For each subterm, produce (expr, constraint) pair.
+              ; if not a ground term, the expr will be an identifier to use as a quant variable
+              (list term-expr (build-term-constraints pname rname this-strand a-term term-expr))))]
+         [term-exprs (map first term-exprs-and-constraints)]
+         [term-vars (filter identifier? term-exprs)])  
+    #`(some #,(map (lambda (q) #`[#,q (join #,parentname #,fieldname)]) term-vars)
+            (and
+             (= (join #,parentname #,fieldname) ; Subterm field contains these exactly
+                #,(if (> (length term-exprs) 1)
+                      #`(+ #,@term-exprs)
+                      #`#,(first term-exprs))) 
+             #,@(map second term-exprs-and-constraints))))) ; which have these shapes and relationships
+
+(define-for-syntax (build-term-constraints pname rname this-strand a-term term-expr)
+  (match a-term
+     [(ast-ground val)     
+      #'true]    
+    [(ast-key owner ktype)
+     #'true]
+    [(ast-enc subterms k)     
+     (build-subterm-list-constraints pname rname term-expr #'plaintext this-strand subterms)
+     ]
+    [(ast-cat subterms)
+     (error (format "unexpected cat in build-term-constraints: ~a" term-expr))]))
+
 
 ; Take an AST struct and produce the corresponding expression relative to given context
 ; use (id->strand-var pname strand-role id)  
@@ -288,7 +307,7 @@
      ; The key belongs to someone corresponding to a variable in this strand
      ; If a private key, we just look them up in owners
      ; If a public key, we need to follow the private key into the pairs relation
-     (let ([local-field (id->strand-var pname strand-role val)])
+     (let ([local-field (id->strand-var pname strand-role owner)])
        (match ktype
          ['privk
           #`(join KeyPairs owners (join #,this-strand-var #,local-field))]
@@ -303,21 +322,21 @@
     [(ast-cat subterms)
      (error (format "unexpected cat in datum-sat->expr: ~a" t))]))
 
-(define-for-syntax (build-key-expression-for-event pname rname rolevar ev)
-  (let* ([contents (ast-event-contents ev)]
-         [key (ast-enc-key contents)]
-         ; This message was encrypted with a key; we locally have a value for whose key it is
-         [local-knower (if key (format-id pname "~a_~a_~a" pname rname (ast-datum-value key)) #f)]) 
-    (cond [(and key (equal? 'privk (ast-datum-wrap key)))
-           ; The key belongs to someone corresponding to a variable in this strand
-           ; If a private key, we just look them up in owners
-           ; If a public key, we need to follow the private key into the pairs relation
-           #`(join KeyPairs owners (join #,rolevar #,local-knower))]
-          [(and key (equal? 'pubk (ast-datum-wrap key)))             
-           #`(join (join KeyPairs owners (join #,rolevar #,local-knower)) (join KeyPairs pairs))]
-          [key
-           (raise (error (format "Message was encrypted, but not with a key term: ~a" contents)))]
-          [else #'none])))
+;(define-for-syntax (build-key-expression-for-event pname rname rolevar ev)
+;  (let* ([contents (ast-event-contents ev)]
+;         [key (ast-enc-key contents)]
+;         ; This message was encrypted with a key; we locally have a value for whose key it is
+;         [local-knower (if key (format-id pname "~a_~a_~a" pname rname (ast-datum-value key)) #f)]) 
+;    (cond [(and key (equal? 'privk (ast-datum-wrap key)))
+;           ; The key belongs to someone corresponding to a variable in this strand
+;           ; If a private key, we just look them up in owners
+;           ; If a public key, we need to follow the private key into the pairs relation
+;           #`(join KeyPairs owners (join #,rolevar #,local-knower))]
+;          [(and key (equal? 'pubk (ast-datum-wrap key)))             
+;           #`(join (join KeyPairs owners (join #,rolevar #,local-knower)) (join KeyPairs pairs))]
+;          [key
+;           (raise (error (format "Message was encrypted, but not with a key term: ~a" contents)))]
+;          [else #'none])))
 
 ;      -- encrypted with public key of whoever is locally "b"
 ;      -- recall "owners" takes us to private key, and then lookup in pairs
@@ -350,9 +369,9 @@
 ; Main macro for defprotocol declarations
 (define-syntax (defprotocol stx)
   (syntax-parse stx [(defprotocol pname:id ptype:id roles:defroleClass ...)
-                     (quasisyntax/loc stx #,(attribute roles.tostruct))
-                     ;(quasisyntax/loc stx
-                     ;  (begin (roleforge pname roles) ...))
+                     ;(quasisyntax/loc stx #,(attribute roles.tostruct))
+                     (quasisyntax/loc stx
+                       (begin (roleforge pname roles) ...))
                      ]))
 
 ;(defskeleton ns
