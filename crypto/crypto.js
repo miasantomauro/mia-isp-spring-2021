@@ -119,7 +119,16 @@ KeyPairs0.pairs.tuples().forEach(x => {
     let public = atoms[1].toString();
     let owner = privKeyMap[private]; 
     pubKeyMap[public] = owner;
-})
+});
+
+/*
+console.log("learnedInformation");
+console.log(learnedInformation);
+console.log("generatedInformation");
+console.log(generatedInformation);
+console.log("visibleInformation");
+console.log(visibleInformation);*/
+
 
 /**
  * gets the names of the timeslots before the given one
@@ -276,6 +285,7 @@ function onMouseClick(mouseevent, timeslot) {
 
     agents.forEach((agent) => {
         const a = agent.toString();
+        console.log("HERE: " + visibleInformation[ts]);
         visible = visibleInformation[ts][a];
         visibleInformation[ts][a] = !visible;
     });
@@ -518,7 +528,10 @@ function render() {
 
                 let textHeight = 20;
 
-                const newInfo = learnedInformation[ts][a];
+                let newInfo = [];
+                if (learnedInformation[ts] && learnedInformation[ts][a]) {
+                    newInfo = learnedInformation[ts][a];
+                }
 
                 // fetch any generated information and remove it from newInfo
                 if (generatedInformation[ts] && generatedInformation[ts][a]) {
