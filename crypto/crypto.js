@@ -1,3 +1,7 @@
+// TODOs
+// - better text formatting (https://github.com/d3plus/d3plus/wiki/Text-Wrapping)
+// - dropped / tampered messages (?)
+
 // constants for our visualization
 const baseX = 150;
 const baseY = 100;
@@ -36,6 +40,9 @@ const pubKeyMap = {};
 // map from private key (Datum) -> owner (Agent)
 const privKeyMap = {};
 
+const agentNames = agents.map(x => x.toString());
+const keyNames = Key.atoms(true).map(x => x.toString());
+
 // populating the learnedInformation object
 agents.forEach((agent) => {
 
@@ -57,8 +64,10 @@ agents.forEach((agent) => {
             learnedInformation[ts][a] = [];
         }
 
-        // store the information in our learnedInformation object
-        learnedInformation[ts][a].push(d);
+        if (ts !== "Timeslot0" || (!agentNames.includes(d) && !keyNames.includes(d))) {
+            // store the information in our learnedInformation object
+            learnedInformation[ts][a].push(d);
+        }
     });
 
     // grab the generated_times data from the forge spec
@@ -120,15 +129,6 @@ KeyPairs0.pairs.tuples().forEach(x => {
     let owner = privKeyMap[private]; 
     pubKeyMap[public] = owner;
 });
-
-/*
-console.log("learnedInformation");
-console.log(learnedInformation);
-console.log("generatedInformation");
-console.log(generatedInformation);
-console.log("visibleInformation");
-console.log(visibleInformation);*/
-
 
 /**
  * gets the names of the timeslots before the given one
@@ -285,7 +285,6 @@ function onMouseClick(mouseevent, timeslot) {
 
     agents.forEach((agent) => {
         const a = agent.toString();
-        console.log("HERE: " + visibleInformation[ts]);
         visible = visibleInformation[ts][a];
         visibleInformation[ts][a] = !visible;
     });
