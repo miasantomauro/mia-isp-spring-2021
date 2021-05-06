@@ -396,87 +396,102 @@
     result))
 (define-for-syntax skeleton-index (box 0))
 
-;; Define a skeleton subsig for each skeleton.
-;(define-syntax (defskeleton stx)
-;  (syntax-parse stx [(defskeleton pname:id vars:varsClass strands:strandClass ...
-;                       non-orig:nonOrigClass uniq-orig:uniqOrigClass (~optional comment:commentClass))
-;                     (let ([idx (unbox-and-increment skeleton-index)])
-;                       (with-syntax ([skelesig (format-id #'pname "skeleton_~a_~a" #'pname idx)])                         
-;                       (quasisyntax/loc stx
-;                         (begin                           
-;                           (sig skelesig #:one) ; declare sig
-;                           ; variable fields (similar to protocol case: TODO -- factor out shared code)                           
-;                           #,@(build-variable-fields (attribute vars.tostruct) #'pname idx #'skelesig #:prefix "skeleton_")
-;
-;                           ; Represent each instance as an existentially quantified role strand, rather than
-;                           ; saving an (unused) explicit link from the skeleton to each declared instance
-;                           ; We do index strands, though, for readable skolem names
-;                                                      
-;                           (pred #,(format-id #'pname "constrain_skeleton_~a_~a" #'pname idx)
-;                                 (and
-;                                  ; Every instance (only "strand" declarations, for the moment) induces some constraints
-;                                  #,@(let* ([strand-decls (attribute strands.tostruct)]
-;                                            [strand-idxs (build-list (length strand-decls) (lambda (x) x))])                                      
-;                                       (for/list ([this-strand-ast strand-decls]
-;                                                  [strand-idx strand-idxs])                                         
-;                                         (build-skeleton-strand-constraints
-;                                          #'pname
-;                                          #'skelesig
-;                                          idx
-;                                          this-strand-ast
-;                                          strand-idx)))                                         
-;                                  ; declarations
-;                                  ; wrap in list for extensibility when we support >1 decl of each type
-;                                  #,@(build-non-orig-constraints (list (attribute non-orig.tostruct)))
-;                                  #,@(build-uniq-orig-constraints (list (attribute uniq-orig.tostruct)))
-;                                  ))))))]))
-;
-;
-;(define-for-syntax (build-non-orig-constraints asts)
-;  (let ([result (flatten
-;             (for/list ([non-orig asts])
-;               (for/list ([decl (ast-non-orig-data non-orig)])
-;                 #`(all ([a Agent])
-;                        (not (originates a #,(datum-ast->expr decl))))                 
-;                 )))])    
-;    result))
-;                            
-;;  #`(#,@(for/list ([non-orig asts])
-; ;         (for/list ([decl (ast-non-orig-data non-orig)])
-; ;           #`(all ([a Agent])
-; ;                  (not (in #,(datum-ast->expr decl)
-; ;                           (join a generated_times Timeslot))))))))
-;
-;; TODO: import
-;(pred (originates str val)
-;      true)
-;
-;
-;(define-for-syntax (build-uniq-orig-constraints asts)
-;  (flatten
-;   (for/list ([uniq-orig asts])
-;     (for/list ([decl (ast-uniq-orig-data uniq-orig)])
-;       #`(lone ([a Agent])
-;               (originates a #,(datum-ast->expr decl)))))))
-;  
-;(define-for-syntax (build-skeleton-strand-constraints pname skelesig skeleton-idx strand-ast strand-idx)  
-;  (let* ([this-strand (format-id #'skelesig "~a_strand~a" skelesig strand-idx)]
-;         [strand-role (ast-strand-role strand-ast)]
-;         [strand-role-sig (format-id #'skelesig "~a_~a" pname strand-role)]
-;         [strand-height (ast-strand-height strand-ast)] ; UNUSED
-;         [maplet-constraints
-;          ; <strand1_0>.resp_a = SkeletonNS_1.s1_a    
-;          #`(#,@(for/list ([mlt (ast-strand-maplets strand-ast)])
-;                  ; Note that datum-ast->expr needs to know the role whose viewpoint we're constraining
-;                  ;  For instance, if the datum is "a", but we're talking about a "resp" strand, then
-;                  ;  we need to use the field "resp_a" since that's what the macro expansion produces.
-;                  (when (ast-datum-wrap (second mlt))
-;                    (error (format "at the moment, terms in maplets must be (unwrapped) identifiers: ~a" (second mlt))))
-;                  #`(= (join #,this-strand #,(id->strand-var pname strand-role (first mlt)))  ; VARIABLE    
-;                       (join #,skelesig #,(id->skeleton-var pname skeleton-idx (ast-datum-value (second mlt))))) ; VALUE                   
-;                  ))])
-;    #`(some ([#,this-strand #,strand-role-sig]) 
-;            (and #,@maplet-constraints))))
+; Define a skeleton subsig for each skeleton.
+(define-syntax (defskeleton stx)
+  (syntax-parse stx [(defskeleton pname:id vars:varsClass strands:strandClass ...
+                       non-orig:nonOrigClass uniq-orig:uniqOrigClass (~optional comment:commentClass))
+                     (let ([idx (unbox-and-increment skeleton-index)])
+                       (with-syntax ([skelesig (format-id #'pname "skeleton_~a_~a" #'pname idx)])                         
+                       (quasisyntax/loc stx
+                         (begin                           
+                           (sig skelesig #:one) ; declare sig
+                           ; variable fields (similar to protocol case: TODO -- factor out shared code)                           
+                           #,@(build-variable-fields (attribute vars.tostruct) #'pname idx #'skelesig #:prefix "skeleton_")
+
+                           ; Represent each instance as an existentially quantified role strand, rather than
+                           ; saving an (unused) explicit link from the skeleton to each declared instance
+                           ; We do index strands, though, for readable skolem names
+                                                      
+                           (pred #,(format-id #'pname "constrain_skeleton_~a_~a" #'pname idx)
+                                 (and
+                                  ; Every instance (only "strand" declarations, for the moment) induces some constraints
+                                  #,@(let* ([strand-decls (attribute strands.tostruct)]
+                                            [strand-idxs (build-list (length strand-decls) (lambda (x) x))])                                      
+                                       (for/list ([this-strand-ast strand-decls]
+                                                  [strand-idx strand-idxs])                                         
+                                         (build-skeleton-strand-constraints
+                                          #'pname
+                                          #'skelesig
+                                          idx
+                                          this-strand-ast
+                                          strand-idx)))                                         
+                                  ; declarations
+                                  ; wrap in list for extensibility when we support >1 decl of each type
+                                  #,@(build-non-orig-constraints #'pname (list (attribute non-orig.tostruct)))
+                                  #,@(build-uniq-orig-constraints #'pname (list (attribute uniq-orig.tostruct)))
+                                  ))))))]))
+
+
+; TODO: challenge: how to get at strand-role? there ISNT one yet
+; and we have given "a" a role-specific field name
+; use forge/core? loop through subsigs of agent that have an _a field?
+
+(define-for-syntax (build-non-orig-constraints asts)
+  (let ([result (flatten
+             (for/list ([non-orig asts])
+               (for/list ([decl (ast-non-orig-data non-orig)])
+                 ; We don't have one specific strand role here; need to cover all of them
+                 ; Challenge: Forge doesn't allow overloading of field names, so the helper needs the role
+                 ; in order to build the fieldname identifier. Use forge/core's scripting support here.
+                 ; At macro-time we don't have the sigs yet. Need to make this a runtime helper.
+                 #`(declaration-helper 'non #'a #'pname)                 
+                 )))])    
+    result))
+
+; ISSUE: this invocation will appear inside macros...
+(define (declaration-helper kind var pname)
+  (let* ([all-sigs (forge:State-sigs forge:curr-state)]
+         [role-sigs (filter (lambda (s) (equal? Agent (forge:Sig-extends s))) all-sigs)])
+    #`(all ([a Agent])
+           (not (originates a #,(datum-ast->expr #'a pname strand-role decl))))                 
+    ))
+
+;  #`(#,@(for/list ([non-orig asts])
+ ;         (for/list ([decl (ast-non-orig-data non-orig)])
+ ;           #`(all ([a Agent])
+ ;                  (not (in #,(datum-ast->expr decl)
+ ;                           (join a generated_times Timeslot))))))))
+
+; TODO: import
+(pred (originates str val)
+      true)
+
+
+(define-for-syntax (build-uniq-orig-constraints asts)
+  (flatten
+   (for/list ([uniq-orig asts])
+     (for/list ([decl (ast-uniq-orig-data uniq-orig)])
+       #`(lone ([a Agent])
+               (originates a #,(datum-ast->expr decl)))))))
+  
+(define-for-syntax (build-skeleton-strand-constraints pname skelesig skeleton-idx strand-ast strand-idx)  
+  (let* ([this-strand (format-id #'skelesig "~a_strand~a" skelesig strand-idx)]
+         [strand-role (ast-strand-role strand-ast)]
+         [strand-role-sig (format-id #'skelesig "~a_~a" pname strand-role)]
+         [strand-height (ast-strand-height strand-ast)] ; UNUSED
+         [maplet-constraints
+          ; <strand1_0>.resp_a = SkeletonNS_1.s1_a    
+          #`(#,@(for/list ([mlt (ast-strand-maplets strand-ast)])
+                  ; Note that datum-ast->expr needs to know the role whose viewpoint we're constraining
+                  ;  For instance, if the datum is "a", but we're talking about a "resp" strand, then
+                  ;  we need to use the field "resp_a" since that's what the macro expansion produces.
+                  (unless (ast-text? (ast-maplet-value mlt))
+                    (error (format "at the moment, right-hand-side terms in maplets must be (unwrapped) identifiers: ~a" (second mlt))))
+                  #`(= (join #,this-strand #,(id->strand-var pname strand-role (ast-maplet-var mlt)))  ; VARIABLE    
+                       (join #,skelesig #,(id->skeleton-var pname skeleton-idx (ast-text-value (ast-maplet-value mlt))))) ; VALUE                   
+                  ))])
+    #`(some ([#,this-strand #,strand-role-sig]) 
+            (and #,@maplet-constraints))))
 
 
 ; this is just the field name for the datum in the strand
@@ -507,19 +522,19 @@
            (send (enc n1 n2 (pubk a)))
            (recv (enc n2 (pubk b))))))
 
-;(defskeleton ns
-;  (vars (a b name) (n1 text))
-;  (defstrand init 3 (a a) (b b) (n1 n1)) 
-;  (non-orig (privk b) (privk a))
-;  (uniq-orig n1)
-;  (comment "Initiator point-of-view"))
-;
-;(defskeleton ns
-;  (vars (a b name) (n2 text))
-;  (defstrand resp 3 (a a) (b b) (n2 n2))
-;  (non-orig (privk a) (privk b))
-;  (uniq-orig n2)
-;  (comment "Responder point-of-view"))
+(defskeleton ns
+  (vars (a b name) (n1 text))
+  (defstrand init 3 (a a) (b b) (n1 n1)) 
+  (non-orig (privk b) (privk a))
+  (uniq-orig n1)
+  (comment "Initiator point-of-view"))
+
+(defskeleton ns
+  (vars (a b name) (n2 text))
+  (defstrand resp 3 (a a) (b b) (n2 n2))
+  (non-orig (privk a) (privk b))
+  (uniq-orig n2)
+  (comment "Responder point-of-view"))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Confirm
