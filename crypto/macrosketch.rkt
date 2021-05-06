@@ -303,17 +303,17 @@
 
 ; Take an AST struct and produce the corresponding expression relative to given context
 ; use (id->strand-var pname strand-role id)  
-(define-for-syntax (datum-ast->expr this-strand-var pname strand-role t)  
+(define-for-syntax (datum-ast->expr this-strand-var pname strand-role-or-skeleton-idx t #:id-converter [id-converter id->strand-var])  
   (match t    
     [(ast-text val)
      ; It's just an identifier; resolve via looking it up in the strand's variables
-     #`(join #,this-strand-var #,(id->strand-var pname strand-role val))]
+     #`(join #,this-strand-var #,(id-converter pname strand-role-or-skeleton-idx val))]
     [(ast-key owner ktype)
      ; It's the key of an identifier; resolve and wrap (owner will be either singleton or 2-ele list)
      ; The key belongs to someone corresponding to a variable in this strand
      ; If a private key, we just look them up in owners
      ; If a public key, we need to follow the private key into the pairs relation
-     (let ([local-field (id->strand-var pname strand-role owner)])
+     (let ([local-field (id-converter pname strand-role-or-skeleton-idx owner)])
        (match ktype
          ['privk
           #`(join KeyPairs owners (join #,this-strand-var #,local-field))]
@@ -427,69 +427,29 @@
                                           strand-idx)))                                         
                                   ; declarations
                                   ; wrap in list for extensibility when we support >1 decl of each type
-                                  #,@(build-orig-constraints #'no ast-non-orig-data #'pname (list (attribute non-orig.tostruct)))
-                                  #,@(build-orig-constraints #'one ast-uniq-orig-data #'pname (list (attribute uniq-orig.tostruct)))
+                                  #,@(build-orig-constraints idx #'no ast-non-orig-data #'pname (list (attribute non-orig.tostruct)))
+                                  #,@(build-orig-constraints idx #'one ast-uniq-orig-data #'pname (list (attribute uniq-orig.tostruct)))
                                   ))))))]))
 
 
-; TODO: challenge: how to get at strand-role? there ISNT one yet
-; and we have given "a" a role-specific field name
-; use forge/core? loop through subsigs of agent that have an _a field?
-
-; WAIT. Overthinking
 ; we don't need to resolve each strand's idea of who "a" is.
-; we just need to the value corresponding to the SKELETON's "a", which we have locally
-
-(define-for-syntax (build-orig-constraints kind accessor pname asts)
+; we just need the value corresponding to the SKELETON's "a", which we have already
+(define-for-syntax (build-orig-constraints skeleton-idx kind accessor pname asts)
   (let ([result
          (flatten
           (for/list ([ast asts])
-            (for/list ([decl (accessor ast)])
-              ; We don't have one specific strand role here; need to cover all of them
-              ; Challenge: Forge doesn't allow overloading of field names, so the helper needs the role
-              ; in order to build the fieldname identifier. Use forge/core's scripting support here.
-              ; At macro-time we don't have the sigs yet. Need to make this a runtime helper.
-              #`(declaration-helper '#,kind #,pname decl)
-              )))])    
+            (for/list ([decl (accessor ast)])              
+              #`(#,kind ([a Agent])
+                     (originates a #,(datum-ast->expr #'a pname skeleton-idx decl #:id-converter id->skeleton-var))))))])  
     result))
 
-; This is a RUNTIME HELPER; returns actual AST not stx
-; Lots of workarounds here due to how Forge formulas get constructed.
-;  - can't just use (all [...]) where ... is plugged in at runtime, since all expects concrete stx.
-;  - datum-ast->expr won't work since it's runtime and we don't have a macrotime AST
 
-(define (declaration-helper kind pname decl)
-  (let* ([all-sigs (forge:State-sigs forge:curr-state)]
-         [role-sigs (filter (lambda (s) (equal? 'Agent (forge:Sig-extends s))) all-sigs)])
-    (node/formula/op/&&
-     #f
-     (for/list ([strand-role role-sigs])
-       (cond
-         [(equal? kind 'no)
-          (no ([a Agent])     
-              (originates a (datum-ast->expr/runtime a pname strand-role decl)))]
-         [(equal? kind 'one)
-          (one ([a Agent])     
-               (originates a (datum-ast->expr/runtime a pname strand-role decl)))]
-         [else (error (format "declaration-helper had unexpected kind ~a" kind))])))))
-
-
-(define-syntax (test stx)
-  (syntax-case stx ()
-    [(test)
-     #`(all ([a univ])
-        (node/formula/op/&&
-         #f
-         (map (lambda (x)
-                (in a (forge:Sig-rel x)))
-              ; extends is a name, not a ref
-              (filter (lambda (s) (equal? (forge:Sig-extends s) 'Agent))
-                      (hash-values (forge:State-sigs forge:curr-state))))))]))
-
+;  (let* ([all-sigs (forge:State-sigs forge:curr-state)]
+;         [role-sigs (filter (lambda (s) (equal? 'Agent (forge:Sig-extends s))) all-sigs)])
 
 ; TODO: import
-(pred (originates str val)
-      true)
+(pred (originates strand value)
+      (not (in strand value)))
 
 (define-for-syntax (build-skeleton-strand-constraints pname skelesig skeleton-idx strand-ast strand-idx)  
   (let* ([this-strand (format-id #'skelesig "~a_strand~a" skelesig strand-idx)]
