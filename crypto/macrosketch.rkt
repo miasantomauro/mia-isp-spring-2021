@@ -19,13 +19,20 @@
 (sig Agent)
 (sig Message)
 (sig Timeslot)
+(relation next (Timeslot Timeslot))
 (sig Datum)
+(sig name #:extends Datum) ; Agent is name, name is Agent -- but atm they are separated and hence join error
+(sig text #:extends Datum)
+
+; TODO: break 1-1 between Agent and Strand
+; TODO: mesg type for OR
+
 (sig KeyPairs #:one)
 (sig Ciphertext #:extends Datum)
 (sig Key #:extends Datum)
 (sig PrivateKey #:extends Key)
 (sig PublicKey #:extends Key)
-(sig LongTermKey #:extends Key)
+(sig skey #:extends Key) ; symmetric, e.g. LTK
 (relation sendTime (Message Timeslot))
 (relation data (Message Datum))
 (relation sender (Message Agent))
@@ -34,9 +41,9 @@
  ;pairs: set PrivateKey -> PublicKey,
  ;owners: set PrivateKey -> Agent
 (relation pairs (KeyPairs PrivateKey PublicKey))
-(relation ltks (KeyPairs Agent Agent LongTermKey))
+(relation ltks (KeyPairs Agent Agent skey))
 (relation owners (KeyPairs PrivateKey Agent))
-(relation plaintext (CipherText Datum))
+(relation plaintext (Ciphertext Datum))
 (relation generated_times (Agent Datum Timeslot))
 
 ; TODO: swap above with the below, once finalized
@@ -572,31 +579,31 @@
 
 
 
+;;
+;(defprotocol or basic
+;  (defrole init (vars (a b s name) (na text) (k skey) (m text))
+;    (trace
+;     (send (cat m a b (enc na m a b (ltk a s))))
+;     (recv (cat m (enc na k (ltk a s))))))
+;  (defrole resp
+;    (vars (a b s name) (nb text) (k skey) (m text) (x y mesg))
+;    (trace
+;     (recv (cat m a b x))
+;     (send (cat m a b x (enc nb m a b (ltk b s))))
+;     (recv (cat m y (enc nb k (ltk b s))))
+;     (send y)))
+;  (defrole serv (vars (a b s name) (na nb text) (k skey) (m text))
+;    (trace
+;     (recv (cat m a b (enc na m a b (ltk a s))
+;		(enc nb m a b (ltk b s))))
+;     (send (cat m (enc na k (ltk a s)) (enc nb k (ltk b s)))))
+;    (uniq-orig k)))
 ;
-(defprotocol or basic
-  (defrole init (vars (a b s name) (na text) (k skey) (m text))
-    (trace
-     (send (cat m a b (enc na m a b (ltk a s))))
-     (recv (cat m (enc na k (ltk a s))))))
-  (defrole resp
-    (vars (a b s name) (nb text) (k skey) (m text) (x y mesg))
-    (trace
-     (recv (cat m a b x))
-     (send (cat m a b x (enc nb m a b (ltk b s))))
-     (recv (cat m y (enc nb k (ltk b s))))
-     (send y)))
-  (defrole serv (vars (a b s name) (na nb text) (k skey) (m text))
-    (trace
-     (recv (cat m a b (enc na m a b (ltk a s))
-		(enc nb m a b (ltk b s))))
-     (send (cat m (enc na k (ltk a s)) (enc nb k (ltk b s)))))
-    (uniq-orig k)))
-
-(defskeleton or
-  (vars (nb text) (s a b name))
-  (defstrand resp 4 (a a) (b b) (s s) (nb nb))
-  (non-orig (ltk a s) (ltk b s))
-  (uniq-orig nb))
+;(defskeleton or
+;  (vars (nb text) (s a b name))
+;  (defstrand resp 4 (a a) (b b) (s s) (nb nb))
+;  (non-orig (ltk a s) (ltk b s))
+;  (uniq-orig nb))
 
 ; Confirm
 (hash-keys (forge:State-sigs forge:curr-state))
@@ -604,3 +611,31 @@
 (hash-keys (forge:State-pred-map forge:curr-state))
 (relation-typelist ns_init_a)
 (relation-typelist skeleton_ns_0_n1)
+
+;;;;;;;;;TESTS (move to another file)
+;
+; exactly 16 Datum, exactly 6 Key, 
+;			exactly 2 SkeletonNS, 
+;			exactly 1 SkeletonNS_0,
+; 		 	exactly 1 SkeletonNS_1, 
+;			exactly 3 PrivateKey, 
+;			exactly 3 PublicKey, 
+;			exactly 0 SymmetricKey, 
+;			exactly 1 Init, 
+;			exactly 1 Resp, 
+;			exactly 1 Attacker, 
+;			exactly 5 Ciphertext, 
+;			exactly 2 Text,
+;			exactly 6 Message,
+; 			exactly 6 Timeslot, 
+;			exactly 1 KeyPairs, 
+;			exactly 3 Agent for {next is linear}
+;
+
+(test NS_SAT
+      #:preds [
+               exec_ns_init
+               exec_ns_resp
+               ]
+      #:bounds [(is next linear)]
+      #:expect sat)
