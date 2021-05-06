@@ -9,6 +9,7 @@
 
 (require syntax/parse syntax/parse/define)
 (require (for-syntax (only-in racket take last flatten drop-right first second third filter-map
+                              string-join
                               or/c define/contract listof [-> -->]) 
                      racket/match
                      racket/syntax))
@@ -24,6 +25,7 @@
 (sig Key #:extends Datum)
 (sig PrivateKey #:extends Key)
 (sig PublicKey #:extends Key)
+(sig LongTermKey #:extends Key)
 (relation sendTime (Message Timeslot))
 (relation data (Message Datum))
 (relation sender (Message Agent))
@@ -32,6 +34,7 @@
  ;pairs: set PrivateKey -> PublicKey,
  ;owners: set PrivateKey -> Agent
 (relation pairs (KeyPairs PrivateKey PublicKey))
+(relation ltks (KeyPairs Agent Agent LongTermKey))
 (relation owners (KeyPairs PrivateKey Agent))
 (relation plaintext (CipherText Datum))
 (relation generated_times (Agent Datum Timeslot))
@@ -121,14 +124,15 @@
   ;    (trace (send (enc n1 a (pubk b)))
   ;           (recv (enc n1 n2 (pubk a)))
   ;           (send (enc n2 (pubk b)))))
-  (struct ast-role (rname vars trace) #:transparent)
+  (struct ast-role (rname vars trace declarations) #:transparent)
   (define-syntax-class defroleClass
     #:description "Role definition"
     (pattern ((~literal defrole)
               rname:id
               vars:varsClass
-              trace:traceClass)                          
-             #:attr tostruct (ast-role #'rname (attribute vars.tostruct) (attribute trace.tostruct))))
+              trace:traceClass
+              decls:declClass ...) 
+             #:attr tostruct (ast-role #'rname (attribute vars.tostruct) (attribute trace.tostruct) (attribute decls.tostruct))))
   
 ;  (vars (a b name) (n1 n2 text))
   (define-syntax-class varsGrouping
@@ -154,7 +158,7 @@
               events:eventClass ...)
              #:attr tostruct (ast-trace (attribute events.tostruct))))
 
-  (struct ast-event (orig type contents) #:transparent)
+  (struct ast-event (origstx type contents) #:transparent)
   (define-syntax-class eventClass
     #:description "Event definition"
     (pattern ((~literal send) vals:termClass ...)             
@@ -179,6 +183,13 @@
               data:termClass ...)
              #:attr tostruct (ast-uniq-orig (attribute data.tostruct))))
 
+  (define-syntax-class declClass
+    #:description "declaration"
+    (pattern d:uniqOrigClass
+             #:attr tostruct (attribute d.tostruct))
+    (pattern d:nonOrigClass
+             #:attr tostruct (attribute d.tostruct)))
+  
   ; (a1 a2)
   ; Name is from CPSA docs. Bind a strand's variable name to a term
   ;   constructed from variables of the skeleton.
@@ -279,7 +290,10 @@
          [term-exprs (map second term-exprs-and-constraints)]
          ; Only quantify when needed (non-ground AST nodes)
          [term-vars (filter-map (lambda (pr) (if (is-ground? (first pr)) #f (second pr)))
-                                term-exprs-and-constraints)])  
+                                term-exprs-and-constraints)])
+    ;(printf "subterms: ~a~n" subterms)
+    ;(printf "term-exprs: ~a~n" term-exprs)
+    ;(printf "term vars: ~a~n" term-vars)
     #`(some #,(map (lambda (q) #`[#,q (join #,parentname #,fieldname)]) term-vars)
             (and
              (= (join #,parentname #,fieldname) ; Subterm field contains these exactly
@@ -294,8 +308,12 @@
      #'true]    
     [(ast-key owner ktype)
      #'true]
-    [(ast-enc subterms k)     
-     (build-subterm-list-constraints pname rname term-expr #'plaintext this-strand subterms)
+    [(ast-enc subterms k)
+     ; Recur for new constraints, but also require that the encryption key is as expected
+     #`(and
+        (= (join #,term-expr encryptionKey)
+           #,(datum-ast->expr this-strand pname rname (ast-enc-key a-term) #:id-converter id->strand-var))
+        #,(build-subterm-list-constraints pname rname term-expr #'plaintext this-strand subterms))
      ]
     [(ast-cat subterms)
      (error (format "unexpected cat in build-term-constraints: ~a" term-expr))]))
@@ -308,22 +326,27 @@
     [(ast-text val)
      ; It's just an identifier; resolve via looking it up in the strand's variables
      #`(join #,this-strand-var #,(id-converter pname strand-role-or-skeleton-idx val))]
-    [(ast-key owner ktype)
+
+    [(ast-key owner-or-pair ktype) 
      ; It's the key of an identifier; resolve and wrap (owner will be either singleton or 2-ele list)
      ; The key belongs to someone corresponding to a variable in this strand
      ; If a private key, we just look them up in owners
-     ; If a public key, we need to follow the private key into the pairs relation
-     (let ([local-field (id-converter pname strand-role-or-skeleton-idx owner)])
-       (match ktype
-         ['privk
-          #`(join KeyPairs owners (join #,this-strand-var #,local-field))]
-         ['pubk
-          #`(join (join KeyPairs owners (join #,this-strand-var #,local-field)) (join KeyPairs pairs))]
-         ['ltk
-          #`(join KeyPairs ltks (join #,this-strand-var #,local-field))]))]
+     ; If a public key, we need to follow the private key into the pairs relation     
+     (match ktype
+       ['privk
+        #`(join KeyPairs owners (join #,this-strand-var #,(id-converter pname strand-role-or-skeleton-idx owner-or-pair)))]
+       ['pubk
+        #`(join (join KeyPairs owners (join #,this-strand-var #,(id-converter pname strand-role-or-skeleton-idx owner-or-pair))) (join KeyPairs pairs))]
+       ['ltk
+        (let ([pr (syntax->list owner-or-pair)])
+          #`(join KeyPairs ltks
+                  (join #,this-strand-var #,(id-converter pname strand-role-or-skeleton-idx (first pr)))
+                  (join #,this-strand-var #,(id-converter pname strand-role-or-skeleton-idx (second pr)))))])]
     [(ast-enc subterms k)
      ; Manufacture a fresh variable id
-     #`#,(format-id pname "enc~a" (gensym))
+     (let ([fresh (gensym)])
+       (printf "Generating ID ~a for ~a~n" fresh (equal-hash-code t))
+       #`#,(format-id pname "enc~a" fresh))
      ]
     [(ast-cat subterms)
      (error (format "unexpected cat in datum-sat->expr: ~a" t))]))
@@ -355,20 +378,20 @@
   ; E.g., ((msg0 . (rel Message)) (msg1 . (- (rel Message) msg0)) (msg2 . (- (- (rel Message) msg1) msg0)))
   (let ([msg-var-decls (for/list ([ev (ast-trace-events a-trace)]
                                   [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
-                         #`[#,(format-id (ast-event-orig ev) "msg~a" i)
-                            #,(foldr (lambda (idx sofar) #`(- #,sofar #,(format-id (ast-event-orig ev) "msg~a" idx)))
+                         #`[#,(format-id (ast-event-origstx ev) "msg~a" i)
+                            #,(foldr (lambda (idx sofar) #`(- #,sofar #,(format-id (ast-event-origstx ev) "msg~a" idx)))
                                      #'Message
                                      (build-list i (lambda (x) x)))])])
     ; Add constraints for every one of the above message variables
     ; Trace structure for this role, plus temporal ordering
-    (with-syntax ([rv (format-id rolesig "x_~a" rolesig)])
+    (with-syntax ([rv (format-id rolesig "arbitrary_~a" rolesig)])
       #`(all ([rv #,rolesig])
              (some (#,@msg-var-decls)
                    (and                                        
                     #,@(for/list ([ev (ast-trace-events a-trace)]
                                   [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
-                         (let ([msg (format-id (ast-event-orig ev) "msg~a" i)]
-                               [prev-msg (if (> i 0) (format-id (ast-event-orig ev) "msg~a"  (- i 1)) #f)])
+                         (let ([msg (format-id (ast-event-origstx ev) "msg~a" i)]
+                               [prev-msg (if (> i 0) (format-id (ast-event-origstx ev) "msg~a"  (- i 1)) #f)])
                            (build-event-assertion pname rname #'rv ev msg prev-msg)))))))))
 
 
@@ -475,7 +498,7 @@
 ; TODO some tangling here vs. variable creation code, should reuse
 ;skeleton_ns_1_n2
 (define-for-syntax (id->skeleton-var pname skeleton-idx id)  
-  (format-id pname "skeleton_~a_~a_~a" pname skeleton-idx id))
+  (format-id pname "skeleton_~a_~a_~a" pname skeleton-idx id))      
 
 ; ns_resp_n2
 (define-for-syntax (id->strand-var pname strand-role id)  
@@ -514,12 +537,6 @@
   (comment "Responder point-of-view"))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; Confirm
-(hash-keys (forge:State-sigs forge:curr-state))
-(hash-keys (forge:State-relations forge:curr-state))
-(hash-keys (forge:State-pred-map forge:curr-state))
-;(relation-typelist ns_init_a)
-;(relation-typelist skeleton_ns_0_n1)
 
 ; Notes:
 ; Basic algebra has sorts (Table 10.3):
@@ -534,28 +551,35 @@
 
 
 ;
-;(defprotocol or basic
-;  (defrole init (vars (a b s name) (na text) (k skey) (m text))
-;    (trace
-;     (send (cat m a b (enc na m a b (ltk a s))))
-;     (recv (cat m (enc na k (ltk a s))))))
-;  (defrole resp
-;    (vars (a b s name) (nb text) (k skey) (m text) (x y mesg))
-;    (trace
-;     (recv (cat m a b x))
-;     (send (cat m a b x (enc nb m a b (ltk b s))))
-;     (recv (cat m y (enc nb k (ltk b s))))
-;     (send y)))
-;  (defrole serv (vars (a b s name) (na nb text) (k skey) (m text))
-;    (trace
-;     (recv (cat m a b (enc na m a b (ltk a s))
-;		(enc nb m a b (ltk b s))))
-;     (send (cat m (enc na k (ltk a s)) (enc nb k (ltk b s)))))
-;    (uniq-orig k)))
-;
-;(defskeleton or
-;  (vars (nb text) (s a b name))
-;  (defstrand resp 4 (a a) (b b) (s s) (nb nb))
-;  (non-orig (ltk a s) (ltk b s))
-;  (uniq-orig nb))
+(defprotocol or basic
+  (defrole init (vars (a b s name) (na text) (k skey) (m text))
+    (trace
+     (send (cat m a b (enc na m a b (ltk a s))))
+     (recv (cat m (enc na k (ltk a s))))))
+  (defrole resp
+    (vars (a b s name) (nb text) (k skey) (m text) (x y mesg))
+    (trace
+     (recv (cat m a b x))
+     (send (cat m a b x (enc nb m a b (ltk b s))))
+     (recv (cat m y (enc nb k (ltk b s))))
+     (send y)))
+  (defrole serv (vars (a b s name) (na nb text) (k skey) (m text))
+    (trace
+     (recv (cat m a b (enc na m a b (ltk a s))
+		(enc nb m a b (ltk b s))))
+     (send (cat m (enc na k (ltk a s)) (enc nb k (ltk b s)))))
+    (uniq-orig k)))
 
+(defskeleton or
+  (vars (nb text) (s a b name))
+  (defstrand resp 4 (a a) (b b) (s s) (nb nb))
+  (non-orig (ltk a s) (ltk b s))
+  (uniq-orig nb))
+
+
+; Confirm
+(hash-keys (forge:State-sigs forge:curr-state))
+(hash-keys (forge:State-relations forge:curr-state))
+(hash-keys (forge:State-pred-map forge:curr-state))
+(relation-typelist ns_init_a)
+(relation-typelist skeleton_ns_0_n1)
