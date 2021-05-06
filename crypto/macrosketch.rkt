@@ -48,6 +48,7 @@
 ;  Note that the AST structs exist at syntax time, because they are used only to generate Forge declarations at syntax time.
 (begin-for-syntax
 
+  
   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   ; Start with a rough approximation of CPSA's term grammar
 
@@ -230,7 +231,8 @@
              ; variable fields of that subsig as declared            
              #,@(build-variable-fields (ast-role-vars rolestruct) #'pname (ast-role-rname rolestruct) #'rolesig)
              ; execution predicate for agents having this role
-             (pred #,(format-id #'pname "exec_~a_~a" #'pname #'role.rname) #,(build-role-predicate-body #'pname #'role.rname #'rolesig (ast-role-trace rolestruct))))))]))
+             (pred #,(format-id #'pname "exec_~a_~a" #'pname #'role.rname)
+                   #,(build-role-predicate-body #'pname #'role.rname #'rolesig (ast-role-trace rolestruct) (ast-role-declarations rolestruct))))))]))
 
 ;(define-for-syntax (build-variable-fields vardecls name1 name2 parent #:prefix [prefix ""])
 (define-for-syntax (build-variable-fields vardecls name1 name2 parent #:prefix [prefix ""])  
@@ -321,11 +323,11 @@
 
 ; Take an AST struct and produce the corresponding expression relative to given context
 ; use (id->strand-var pname strand-role id)  
-(define-for-syntax (datum-ast->expr this-strand-var pname strand-role-or-skeleton-idx t #:id-converter [id-converter id->strand-var])  
+(define-for-syntax (datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx t #:id-converter [id-converter id->strand-var])  
   (match t    
     [(ast-text val)
      ; It's just an identifier; resolve via looking it up in the strand's variables
-     #`(join #,this-strand-var #,(id-converter pname strand-role-or-skeleton-idx val))]
+     #`(join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx val))]
 
     [(ast-key owner-or-pair ktype) 
      ; It's the key of an identifier; resolve and wrap (owner will be either singleton or 2-ele list)
@@ -334,18 +336,18 @@
      ; If a public key, we need to follow the private key into the pairs relation     
      (match ktype
        ['privk
-        #`(join KeyPairs owners (join #,this-strand-var #,(id-converter pname strand-role-or-skeleton-idx owner-or-pair)))]
+        #`(join KeyPairs owners (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx owner-or-pair)))]
        ['pubk
-        #`(join (join KeyPairs owners (join #,this-strand-var #,(id-converter pname strand-role-or-skeleton-idx owner-or-pair))) (join KeyPairs pairs))]
+        #`(join (join KeyPairs owners (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx owner-or-pair))) (join KeyPairs pairs))]
        ['ltk
         (let ([pr (syntax->list owner-or-pair)])
           #`(join KeyPairs ltks
-                  (join #,this-strand-var #,(id-converter pname strand-role-or-skeleton-idx (first pr)))
-                  (join #,this-strand-var #,(id-converter pname strand-role-or-skeleton-idx (second pr)))))])]
+                  (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx (first pr)))
+                  (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx (second pr)))))])]
     [(ast-enc subterms k)
      ; Manufacture a fresh variable id
      (let ([fresh (gensym)])
-       (printf "Generating ID ~a for ~a~n" fresh (equal-hash-code t))
+       ;(printf "Generating ID ~a for ~a~n" fresh (equal-hash-code t))
        #`#,(format-id pname "enc~a" fresh))
      ]
     [(ast-cat subterms)
@@ -374,7 +376,7 @@
 
 ; (recv (enc n1 a (pubk b)))
   
-(define-for-syntax (build-role-predicate-body pname rname rolesig a-trace)
+(define-for-syntax (build-role-predicate-body pname rname rolesig a-trace role-decls)
   ; E.g., ((msg0 . (rel Message)) (msg1 . (- (rel Message) msg0)) (msg2 . (- (- (rel Message) msg1) msg0)))
   (let ([msg-var-decls (for/list ([ev (ast-trace-events a-trace)]
                                   [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
@@ -386,13 +388,31 @@
     ; Trace structure for this role, plus temporal ordering
     (with-syntax ([rv (format-id rolesig "arbitrary_~a" rolesig)])
       #`(all ([rv #,rolesig])
-             (some (#,@msg-var-decls)
-                   (and                                        
-                    #,@(for/list ([ev (ast-trace-events a-trace)]
-                                  [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
-                         (let ([msg (format-id (ast-event-origstx ev) "msg~a" i)]
-                               [prev-msg (if (> i 0) (format-id (ast-event-origstx ev) "msg~a"  (- i 1)) #f)])
-                           (build-event-assertion pname rname #'rv ev msg prev-msg)))))))))
+             (and
+              #,@(build-role-orig-constraints #'rv pname rname rolesig role-decls)
+              (some (#,@msg-var-decls)
+                    (and                                        
+                     #,@(for/list ([ev (ast-trace-events a-trace)]
+                                   [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
+                          (let ([msg (format-id (ast-event-origstx ev) "msg~a" i)]
+                                [prev-msg (if (> i 0) (format-id (ast-event-origstx ev) "msg~a"  (- i 1)) #f)])
+                            (build-event-assertion pname rname #'rv ev msg prev-msg))))))))))
+
+
+(define-for-syntax (struct->name a-struct)
+  (define-values (t s) (struct-info a-struct))
+  (define-values (n ifc afc ap mp ikl st s2) (struct-type-info t))
+  n)
+
+(define-for-syntax (build-role-orig-constraints rv pname rname rolesig role-decls)  
+  (flatten
+   (for/list ([d role-decls])
+     (cond [(equal? (struct->name d) 'ast-uniq-orig)
+            (build-orig-constraints rv rname #'one ast-uniq-orig-data pname (list d) #:id-converter id->strand-var)]
+           [(equal? (struct->name d) 'ast-non-orig)
+            (build-orig-constraints rv rname #'no ast-non-orig-data pname (list d) #:id-converter id->strand-var)]
+           [else
+            (error (format "unknown decl type: ~a in ~a" (struct->name d) d))]))))
 
 
 ; Main macro for defprotocol declarations
@@ -450,20 +470,22 @@
                                           strand-idx)))                                         
                                   ; declarations
                                   ; wrap in list for extensibility when we support >1 decl of each type
-                                  #,@(build-orig-constraints idx #'no ast-non-orig-data #'pname (list (attribute non-orig.tostruct)))
-                                  #,@(build-orig-constraints idx #'one ast-uniq-orig-data #'pname (list (attribute uniq-orig.tostruct)))
+                                  #,@(build-orig-constraints #'skelesig idx #'no ast-non-orig-data #'pname (list (attribute non-orig.tostruct)))
+                                  #,@(build-orig-constraints #'skelesig idx #'one ast-uniq-orig-data #'pname (list (attribute uniq-orig.tostruct)))
                                   ))))))]))
 
 
 ; we don't need to resolve each strand's idea of who "a" is.
-; we just need the value corresponding to the SKELETON's "a", which we have already
-(define-for-syntax (build-orig-constraints skeleton-idx kind accessor pname asts)
+; we just need the value corresponding to the SKELETON's "a" (or the local strand's "a", if this came from a role defn), which we have already
+(define-for-syntax (build-orig-constraints this-strand-or-skeleton
+                                           strand-role-or-skeleton-idx
+                                           kind accessor pname asts #:id-converter [id-converter id->skeleton-var])
   (let ([result
          (flatten
           (for/list ([ast asts])
             (for/list ([decl (accessor ast)])              
-              #`(#,kind ([a Agent])
-                     (originates a #,(datum-ast->expr #'a pname skeleton-idx decl #:id-converter id->skeleton-var))))))])  
+              #`(#,kind ([anAgent Agent])
+                     (originates anAgent #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx decl #:id-converter id-converter))))))])  
     result))
 
 
@@ -575,7 +597,6 @@
   (defstrand resp 4 (a a) (b b) (s s) (nb nb))
   (non-orig (ltk a s) (ltk b s))
   (uniq-orig nb))
-
 
 ; Confirm
 (hash-keys (forge:State-sigs forge:curr-state))
