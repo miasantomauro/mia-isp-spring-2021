@@ -427,8 +427,8 @@
                                           strand-idx)))                                         
                                   ; declarations
                                   ; wrap in list for extensibility when we support >1 decl of each type
-                                  #,@(build-non-orig-constraints #'pname (list (attribute non-orig.tostruct)))
-                                  #,@(build-uniq-orig-constraints #'pname (list (attribute uniq-orig.tostruct)))
+                                  #,@(build-orig-constraints #'no ast-non-orig-data #'pname (list (attribute non-orig.tostruct)))
+                                  #,@(build-orig-constraints #'one ast-uniq-orig-data #'pname (list (attribute uniq-orig.tostruct)))
                                   ))))))]))
 
 
@@ -436,44 +436,61 @@
 ; and we have given "a" a role-specific field name
 ; use forge/core? loop through subsigs of agent that have an _a field?
 
-(define-for-syntax (build-non-orig-constraints asts)
-  (let ([result (flatten
-             (for/list ([non-orig asts])
-               (for/list ([decl (ast-non-orig-data non-orig)])
-                 ; We don't have one specific strand role here; need to cover all of them
-                 ; Challenge: Forge doesn't allow overloading of field names, so the helper needs the role
-                 ; in order to build the fieldname identifier. Use forge/core's scripting support here.
-                 ; At macro-time we don't have the sigs yet. Need to make this a runtime helper.
-                 #`(declaration-helper 'non #'a #'pname)                 
-                 )))])    
+; WAIT. Overthinking
+; we don't need to resolve each strand's idea of who "a" is.
+; we just need to the value corresponding to the SKELETON's "a", which we have locally
+
+(define-for-syntax (build-orig-constraints kind accessor pname asts)
+  (let ([result
+         (flatten
+          (for/list ([ast asts])
+            (for/list ([decl (accessor ast)])
+              ; We don't have one specific strand role here; need to cover all of them
+              ; Challenge: Forge doesn't allow overloading of field names, so the helper needs the role
+              ; in order to build the fieldname identifier. Use forge/core's scripting support here.
+              ; At macro-time we don't have the sigs yet. Need to make this a runtime helper.
+              #`(declaration-helper '#,kind #,pname decl)
+              )))])    
     result))
 
-; ISSUE: this invocation will appear inside macros...
-(define (declaration-helper kind var pname)
-  (let* ([all-sigs (forge:State-sigs forge:curr-state)]
-         [role-sigs (filter (lambda (s) (equal? Agent (forge:Sig-extends s))) all-sigs)])
-    #`(all ([a Agent])
-           (not (originates a #,(datum-ast->expr #'a pname strand-role decl))))                 
-    ))
+; This is a RUNTIME HELPER; returns actual AST not stx
+; Lots of workarounds here due to how Forge formulas get constructed.
+;  - can't just use (all [...]) where ... is plugged in at runtime, since all expects concrete stx.
+;  - datum-ast->expr won't work since it's runtime and we don't have a macrotime AST
 
-;  #`(#,@(for/list ([non-orig asts])
- ;         (for/list ([decl (ast-non-orig-data non-orig)])
- ;           #`(all ([a Agent])
- ;                  (not (in #,(datum-ast->expr decl)
- ;                           (join a generated_times Timeslot))))))))
+(define (declaration-helper kind pname decl)
+  (let* ([all-sigs (forge:State-sigs forge:curr-state)]
+         [role-sigs (filter (lambda (s) (equal? 'Agent (forge:Sig-extends s))) all-sigs)])
+    (node/formula/op/&&
+     #f
+     (for/list ([strand-role role-sigs])
+       (cond
+         [(equal? kind 'no)
+          (no ([a Agent])     
+              (originates a (datum-ast->expr/runtime a pname strand-role decl)))]
+         [(equal? kind 'one)
+          (one ([a Agent])     
+               (originates a (datum-ast->expr/runtime a pname strand-role decl)))]
+         [else (error (format "declaration-helper had unexpected kind ~a" kind))])))))
+
+
+(define-syntax (test stx)
+  (syntax-case stx ()
+    [(test)
+     #`(all ([a univ])
+        (node/formula/op/&&
+         #f
+         (map (lambda (x)
+                (in a (forge:Sig-rel x)))
+              ; extends is a name, not a ref
+              (filter (lambda (s) (equal? (forge:Sig-extends s) 'Agent))
+                      (hash-values (forge:State-sigs forge:curr-state))))))]))
+
 
 ; TODO: import
 (pred (originates str val)
       true)
 
-
-(define-for-syntax (build-uniq-orig-constraints asts)
-  (flatten
-   (for/list ([uniq-orig asts])
-     (for/list ([decl (ast-uniq-orig-data uniq-orig)])
-       #`(lone ([a Agent])
-               (originates a #,(datum-ast->expr decl)))))))
-  
 (define-for-syntax (build-skeleton-strand-constraints pname skelesig skeleton-idx strand-ast strand-idx)  
   (let* ([this-strand (format-id #'skelesig "~a_strand~a" skelesig strand-idx)]
          [strand-role (ast-strand-role strand-ast)]
