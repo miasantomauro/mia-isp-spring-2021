@@ -18,7 +18,8 @@
 ; TODO: break 1-1 between name and Strand
 
 (require "base.rkt") ; the base crypto model
-(provide all-defined-out)
+(provide (all-from-out "base.rkt")) ; let caller refer to base preds
+(provide all-defined-out)           ; let caller refer to constructed preds
 
 ; First, define some syntax classes to ease parsing and improve errors.
 ; Syntax classes can expose custom attributes, which make them easier to process.
