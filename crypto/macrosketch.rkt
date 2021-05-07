@@ -227,7 +227,7 @@
          #,(format-id name1 "~a~a_~a_~a" prefix name1 name2 #'varid)
          (#,parent type)))))
 
-(define-for-syntax (build-event-assertion pname rname this-strand ev msg prev-msg)
+(define-for-syntax (build-event-assertion pname rname this-strand ev msg prev-msg)  
   ;(printf "ast-event-contents ev: ~a~n" (ast-event-contents ev))
   ; First, assert temporal ordering on this message variable; msg happens strictly after prev-msg unless no prev-msg
   #`(&& #,(if prev-msg
@@ -337,7 +337,7 @@
 
 ; (recv (enc n1 a (pubk b)))
   
-(define-for-syntax (build-role-predicate-body pname rname rolesig a-trace role-decls vars)
+(define-for-syntax (build-role-predicate-body pname rname rolesig a-trace role-decls vars)  
   ; E.g., ((msg0 . (rel Message)) (msg1 . (- (rel Message) msg0)) (msg2 . (- (- (rel Message) msg1) msg0)))
   (let ([msg-var-decls (for/list ([ev (ast-trace-events a-trace)]
                                   [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])

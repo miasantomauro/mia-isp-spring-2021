@@ -142,7 +142,7 @@ pred wellformed {
 }
 
 pred exploit_search {
-  some t: text | 
+ /* some t: text | 
   some c: Ciphertext | 
   some m: Message | 
   some t2: text - t | 
@@ -156,7 +156,7 @@ pred exploit_search {
     m2.data = c2 and
     t2 in c2.plaintext and
     t2 in (Attacker.learned_times).Timeslot
-  }
+  }*/
 
 }
 

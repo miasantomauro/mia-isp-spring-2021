@@ -46,6 +46,32 @@
 ;(relation-typelist skeleton_ns_0_n1)
 
 
+ ;some t1, t2: text | {
+ ;     t1 in (Attacker.learned_times).Timeslot
+ ;     t2 in (Attacker.learned_times).Timeslot
+ ;     t1 not in (Attacker.generated_times).Timeslot
+ ;     t2 not in (Attacker.generated_times).Timeslot
+ ; }
+
+; The attacker learns the initiator's n1 and n2
+; but the attacker generated neither
+(pred attack_exists
+      (in (+ (join ns_init ns_init_n1)
+             (join ns_init ns_init_n2))
+          (join Attacker learned_times Timeslot))
+      
+      (! (in (join ns_init ns_init_n1)             
+             (join Attacker generated_times Timeslot)))
+      (! (in (join ns_init ns_init_n2)             
+             (join Attacker generated_times Timeslot)))
+      ; Stopgap: initiator believes they are a, and responder believes they are b
+      (= (join ns_init ns_init_a) ns_init)            
+      (= (join ns_resp ns_resp_b) ns_resp)
+      
+      ; Require the secrets to be different
+      (! (= (join ns_init ns_init_n1)
+            (join ns_init ns_init_n2))))
+
 (test ns_fixed_SAT
       #:preds [
                exec_ns_init
@@ -54,7 +80,7 @@
                constrain_skeleton_ns_1
                temporary
                wellformed
-               ;exploit_search
+               ;attack_exists
                ]
       #:bounds [(is next linear)]
       #:scope [(mesg 16)
@@ -84,7 +110,7 @@
                constrain_skeleton_ns_1
                temporary
                wellformed
-               exploit_search
+               attack_exists
                ]
       #:bounds [(is next linear)]
       #:scope [(mesg 16)

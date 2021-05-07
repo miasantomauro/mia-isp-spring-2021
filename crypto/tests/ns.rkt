@@ -52,6 +52,24 @@
 (set-option! 'coregranularity 2)
 (set-option! 'core_minimization 'rce)
 
+(pred attack_exists
+      (in (+ (join ns_init ns_init_n1)
+             (join ns_init ns_init_n2))
+          (join Attacker learned_times Timeslot))
+      
+      (! (in (join ns_init ns_init_n1)             
+             (join Attacker generated_times Timeslot)))
+      (! (in (join ns_init ns_init_n2)             
+             (join Attacker generated_times Timeslot)))
+
+      ; Stopgap: initiator believes they are a, and responder believes they are b
+      (= (join ns_init ns_init_a) ns_init)            
+      (= (join ns_resp ns_resp_b) ns_resp)
+      
+      ; Require the secrets to be different
+      (! (= (join ns_init ns_init_n1)
+            (join ns_init ns_init_n2))))
+
 (run NS_SAT
       #:preds [
                exec_ns_init
@@ -60,7 +78,7 @@
                constrain_skeleton_ns_1
                temporary
                wellformed
-               exploit_search
+               attack_exists
                ]
       #:bounds [(is next linear)]
       #:scope [(mesg 16)
