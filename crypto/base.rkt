@@ -202,6 +202,10 @@ pred originates[a: name, d: mesg] {
   }
 }
 
+pred generates[a: name, d: mesg] {
+  some (a.generated_times)[d]
+}
+
 /*
 run {
   temporary

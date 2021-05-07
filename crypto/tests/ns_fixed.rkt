@@ -12,12 +12,12 @@
   (defrole init
     (vars (a b name) (n1 n2 text))
     (trace (send (enc n1 a (pubk b)))
-           (recv (enc n1 n2 (pubk a)))
+           (recv (enc b n1 n2 (pubk a)))
            (send (enc n2 (pubk b)))))
   (defrole resp 
     (vars (a b name) (n1 n2 text))
     (trace (recv (enc n1 a (pubk b)))
-           (send (enc n1 n2 (pubk a)))
+           (send (enc b n1 n2 (pubk a)))
            (recv (enc n2 (pubk b))))))
 
 (defskeleton ns
@@ -46,13 +46,37 @@
 ;(relation-typelist skeleton_ns_0_n1)
 
 
-(set-option! 'verbose 5)
-(set-option! 'solver 'MiniSatProver)
-(set-option! 'logtranslation 2)
-(set-option! 'coregranularity 2)
-(set-option! 'core_minimization 'rce)
+(test ns_fixed_SAT
+      #:preds [
+               exec_ns_init
+               exec_ns_resp
+               constrain_skeleton_ns_0
+               constrain_skeleton_ns_1
+               temporary
+               wellformed
+               ;exploit_search
+               ]
+      #:bounds [(is next linear)]
+      #:scope [(mesg 16)
+               (Key 6 6)
+               (name 3 3)
+               (KeyPairs 1 1)
+               (Timeslot 6 6) ; TODO: for opt, consider merge with Message?
+               (Message 6 6) ; not "mesg"
+               (text 2 2)
+               (Ciphertext 5 5)
+               (Attacker 1 1)
+               (ns_init 1 1)
+               (ns_resp 1 1)
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
+               (skey 0 0)
+               (skeleton_ns_0 1 1)
+               (skeleton_ns_1 1 1)
+               ]
+      #:expect sat)
 
-(run NS_SAT
+(run ns_fixed_exploit_UNSAT
       #:preds [
                exec_ns_init
                exec_ns_resp
@@ -80,10 +104,8 @@
                (skeleton_ns_0 1 1)
                (skeleton_ns_1 1 1)
                ]
-      ;#:expect sat
+      ;#:expect unsat
       )
 
-(display NS_SAT)
-; This will auto-highlight if settings are correct
-; (tree:get-value (forge:Run-result NS_SAT))
-;(is-sat? NS_SAT)
+(display ns_fixed_exploit_UNSAT)
+

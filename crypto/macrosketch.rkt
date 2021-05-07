@@ -4,6 +4,9 @@
 ; base crypto specification with protocol/skeleton-specific sigs and constraints.
 ;   Tim and Abby (Spring 2021)
 
+; DESIGN CHOICES:
+;   - non-orig and uniq-orig enforce both non/unique origination and non/unique generation.
+
 ;https://hackage.haskell.org/package/cpsa-3.3.2/src/doc/cpsamanual.pdf
 ; At the moment, we have prototype support for the "basic" algebra
 
@@ -211,7 +214,10 @@
              #,@(build-variable-fields (ast-role-vars rolestruct) #'pname (ast-role-rname rolestruct) #'rolesig)
              ; execution predicate for agents having this role
              (pred #,(format-id #'pname "exec_~a_~a" #'pname #'role.rname)
-                   #,(build-role-predicate-body #'pname #'role.rname #'rolesig (ast-role-trace rolestruct) (ast-role-declarations rolestruct))))))]))
+                   #,(build-role-predicate-body #'pname #'role.rname #'rolesig
+                                                (ast-role-trace rolestruct)
+                                                (ast-role-declarations rolestruct)
+                                                (ast-role-vars rolestruct))))))]))
 
 (define-for-syntax (build-variable-fields vardecls name1 name2 parent #:prefix [prefix ""])  
   (for/list ([decl (ast-vars-assoc-decls vardecls)])
@@ -331,7 +337,7 @@
 
 ; (recv (enc n1 a (pubk b)))
   
-(define-for-syntax (build-role-predicate-body pname rname rolesig a-trace role-decls)
+(define-for-syntax (build-role-predicate-body pname rname rolesig a-trace role-decls vars)
   ; E.g., ((msg0 . (rel Message)) (msg1 . (- (rel Message) msg0)) (msg2 . (- (- (rel Message) msg1) msg0)))
   (let ([msg-var-decls (for/list ([ev (ast-trace-events a-trace)]
                                   [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
@@ -344,7 +350,13 @@
     (with-syntax ([rv (format-id rolesig "arbitrary_~a" rolesig)])
       #`(all ([rv #,rolesig])
              (&&
+              ; sometimes non-orig etc. appear in role definition
               #,@(build-role-orig-constraints #'rv pname rname rolesig role-decls)
+              ; enforce that every variable is populated uniquely
+              #,@(for/list ([vt (ast-vars-assoc-decls vars)])
+                   (let ([v (first vt)])                     
+                     #`(one (join rv #,(id->strand-var pname rname v))))) 
+              ; trace assertions
               (some (#,@msg-var-decls)
                     (&&                                        
                      #,@(for/list ([ev (ast-trace-events a-trace)]
@@ -422,7 +434,11 @@
                                           #'skelesig
                                           idx
                                           this-strand-ast
-                                          strand-idx)))                                         
+                                          strand-idx)))
+                                  ; enforce that every variable is populated uniquely
+                                  #,@(for/list ([vt (ast-vars-assoc-decls (attribute vars.tostruct))])
+                                       (let ([v (first vt)])                     
+                                         #`(one (join skelesig #,(id->skeleton-var #'pname idx v))))) 
                                   ; declarations
                                   ; wrap in list for extensibility when we support >1 decl of each type
                                   #,@(build-orig-constraints #'skelesig idx #'no ast-non-orig-data #'pname (list (attribute non-orig.tostruct)))
@@ -438,9 +454,17 @@
   (let ([result
          (flatten
           (for/list ([ast asts])
-            (for/list ([decl (accessor ast)])              
+            (for/list ([term (accessor ast)])              
               #`(#,kind ([aStrand name])
-                     (originates aStrand #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx decl #:id-converter id-converter))))))])  
+                        (||
+                         (originates aStrand
+                                     #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter))
+                         ; conflate origination and generation, but only when it's well-typed to do so
+                         ; (generation in our model is for text only, not keys -- TODO check soundness)
+                         #,(if (ast-text? term)
+                               #`(generates aStrand
+                                    #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter))
+                               #'false))))))])
     result))
 
 

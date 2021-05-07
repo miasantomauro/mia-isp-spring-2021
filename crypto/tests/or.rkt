@@ -3,9 +3,9 @@
 
 (set-option! 'verbose 5)
 (set-option! 'solver 'MiniSatProver)
-(set-option! 'logtranslation 2)
-(set-option! 'coregranularity 2)
-(set-option! 'core_minimization 'rce)
+(set-option! 'logtranslation 1)
+(set-option! 'coregranularity 1)
+(set-option! 'core_minimization 'hybrid)
 
 
 (defprotocol or basic
