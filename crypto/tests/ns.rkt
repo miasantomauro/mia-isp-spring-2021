@@ -37,12 +37,12 @@
 ; Confirm
 ;(hash-keys (forge:State-sigs forge:curr-state))
 ;(hash-keys (forge:State-relations forge:curr-state))
-;(hash-keys (forge:State-pred-map forge:curr-state))
+(hash-keys (forge:State-pred-map forge:curr-state))
 ;(relation-typelist ns_init_a)
 ;(relation-typelist skeleton_ns_0_n1)
 
 
-#;(test NS_SAT
+(test NS_SAT
       #:preds [
                exec_ns_init
                exec_ns_resp

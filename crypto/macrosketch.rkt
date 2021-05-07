@@ -447,9 +447,9 @@
 ;         [role-sigs (filter (lambda (s) (equal? 'name (forge:Sig-extends s))) all-sigs)])
 
 (define-for-syntax (build-skeleton-strand-constraints pname skelesig skeleton-idx strand-ast strand-idx)  
-  (let* ([this-strand (format-id #'skelesig "~a_strand~a" skelesig strand-idx)]
+  (let* ([this-strand (format-id skelesig "~a_strand~a" skelesig strand-idx)]
          [strand-role (ast-strand-role strand-ast)]
-         [strand-role-sig (format-id #'skelesig "~a_~a" pname strand-role)]
+         [strand-role-sig (format-id skelesig "~a_~a" pname strand-role)]
          [strand-height (ast-strand-height strand-ast)] ; UNUSED
          [maplet-constraints
           ; <strand1_0>.resp_a = SkeletonNS_1.s1_a    
