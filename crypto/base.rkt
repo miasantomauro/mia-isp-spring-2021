@@ -17,8 +17,9 @@ sig skey extends Key {}
 -- relation to match key pairs -- 
 
 one sig KeyPairs {
- pairs: set PrivateKey -> PublicKey,
- owners: set PrivateKey -> name
+  pairs: set PrivateKey -> PublicKey,
+  owners: set PrivateKey -> name,
+  ltks: set name -> name -> skey
 }
 
 -- t=0, t=1, ...
