@@ -1,6 +1,12 @@
 #lang forge/core
 (require "../macrosketch.rkt")
 
+(set-option! 'verbose 5)
+(set-option! 'solver 'MiniSatProver)
+(set-option! 'logtranslation 2)
+(set-option! 'coregranularity 2)
+(set-option! 'core_minimization 'rce)
+
 
 (defprotocol or basic
   (defrole init (vars (a b s name) (na text) (k skey) (m text))
@@ -26,3 +32,43 @@
   (defstrand resp 4 (a a) (b b) (s s) (nb nb))
   (non-orig (ltk a s) (ltk b s))
   (uniq-orig nb))
+
+
+
+(run OR_SAT
+      #:preds [
+               exec_or_init
+               exec_or_resp
+               exec_or_serv
+               constrain_skeleton_or_0               
+               temporary
+               wellformed               
+               ]
+      #:bounds [(is next linear)]
+      #:scope [(mesg 21) ; (9 Key (??) + 4 name + 5 cipher + 3 text) -- except *21* in bound?
+               (Key 9 9)
+               (name 4 4)
+               (KeyPairs 1 1)
+               (Timeslot 8 8) ; TODO: for opt, consider merge with Message?
+               (Message 8 8) ; not "mesg" ; right now we're doubling up
+               (text 3 3)
+               (Ciphertext 5 5)
+               (Attacker 1 1)
+               (or_init 1 1)
+               (or_resp 1 1)
+               (or_serv 1 1)
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
+               (skey 3 3)
+               (skeleton_or_0 1 1)
+              ; (Int 6 6) ; Needed due to upper bound
+               ;; -- unsure why needed here but not in NS
+               (Int 5 5) ; DO need to be able to count #Keys though
+               ]
+      ;#:expect sat
+      )
+
+(display OR_SAT)
+; This will auto-highlight if settings are correct
+; (tree:get-value (forge:Run-result NS_SAT))
+;(is-sat? NS_SAT)

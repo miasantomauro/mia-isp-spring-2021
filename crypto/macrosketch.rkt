@@ -224,7 +224,7 @@
 (define-for-syntax (build-event-assertion pname rname this-strand ev msg prev-msg)
   ;(printf "ast-event-contents ev: ~a~n" (ast-event-contents ev))
   ; First, assert temporal ordering on this message variable; msg happens strictly after prev-msg unless no prev-msg
-  #`(and #,(if prev-msg
+  #`(&& #,(if prev-msg
                #`(in (join #,msg sendTime) (join #,prev-msg sendTime (^ next)))
                #`true)
 
@@ -273,7 +273,7 @@
                                 term-exprs-and-constraints)])
 
     #`(some #,(map (lambda (q) #`[#,q (join #,parentname #,fieldname)]) term-vars)
-            (and
+            (&&
              (= (join #,parentname #,fieldname) ; Subterm field contains these exactly
                 #,(if (> (length term-exprs) 1)
                       #`(+ #,@term-exprs)
@@ -288,7 +288,7 @@
      #'true]
     [(ast-enc subterms k)
      ; Recur for new constraints, but also require that the encryption key is as expected
-     #`(and
+     #`(&&
         (= (join #,term-expr encryptionKey)
            #,(datum-ast->expr this-strand pname rname (ast-enc-key a-term) #:id-converter id->strand-var))
         #,(build-subterm-list-constraints pname rname term-expr #'plaintext this-strand subterms))
@@ -317,9 +317,9 @@
         #`(join (join KeyPairs owners (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx owner-or-pair))) (join KeyPairs pairs))]
        ['ltk
         (let ([pr (syntax->list owner-or-pair)])
-          #`(join KeyPairs ltks
-                  (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx (first pr)))
-                  (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx (second pr)))))])]
+          #`(getLTK 
+             (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx (first pr)))
+             (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx (second pr)))))])]
     [(ast-enc subterms k)
      ; Manufacture a fresh variable id
      (let ([fresh (gensym)])
@@ -343,10 +343,10 @@
     ; Trace structure for this role, plus temporal ordering
     (with-syntax ([rv (format-id rolesig "arbitrary_~a" rolesig)])
       #`(all ([rv #,rolesig])
-             (and
+             (&&
               #,@(build-role-orig-constraints #'rv pname rname rolesig role-decls)
               (some (#,@msg-var-decls)
-                    (and                                        
+                    (&&                                        
                      #,@(for/list ([ev (ast-trace-events a-trace)]
                                    [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
                           (let ([msg (format-id (ast-event-origstx ev) "msg~a" i)]
@@ -411,7 +411,7 @@
                            ; We do index strands, though, for readable skolem names
                                                       
                            (pred #,(format-id #'pname "constrain_skeleton_~a_~a" #'pname idx)
-                                 (and
+                                 (&&
                                   ; Every instance (only "strand" declarations, for the moment) induces some constraints
                                   #,@(let* ([strand-decls (attribute strands.tostruct)]
                                             [strand-idxs (build-list (length strand-decls) (lambda (x) x))])                                      
@@ -464,7 +464,7 @@
                        (join #,skelesig #,(id->skeleton-var pname skeleton-idx (ast-text-value (ast-maplet-value mlt))))) ; VALUE                   
                   ))])
     #`(some ([#,this-strand #,strand-role-sig]) 
-            (and #,@maplet-constraints))))
+            (&& #,@maplet-constraints))))
 
 
 ; this is just the field name for the datum in the strand

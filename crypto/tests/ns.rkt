@@ -1,6 +1,10 @@
 #lang forge/core
 (require "../macrosketch.rkt") ; TODO #lang
 
+; Sterling isn't displaying this right
+;(set-option! 'skolem_depth 2)
+;(set-option! 'verbose 5)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Needham-Schroeder example from CSPA
 
@@ -42,7 +46,7 @@
 ;(relation-typelist skeleton_ns_0_n1)
 
 
-(test NS_SAT
+(run NS_SAT
       #:preds [
                exec_ns_init
                exec_ns_resp
@@ -70,9 +74,10 @@
                (skeleton_ns_0 1 1)
                (skeleton_ns_1 1 1)
                ]
-      #:expect sat
+      ;#:expect sat
       )
 
+(display NS_SAT)
 ; This will auto-highlight if settings are correct
 ; (tree:get-value (forge:Run-result NS_SAT))
 ;(is-sat? NS_SAT)

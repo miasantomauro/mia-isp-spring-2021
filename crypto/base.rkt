@@ -22,6 +22,10 @@ one sig KeyPairs {
   ltks: set name -> name -> skey
 }
 
+fun getLTK[name_a: name, name_b: name]: one skey {
+  (KeyPairs.ltks)[name_a][name_b]
+}
+
 -- t=0, t=1, ...
 sig Timeslot {
   next: lone Timeslot
@@ -132,6 +136,9 @@ pred wellformed {
   PrivateKey.(KeyPairs.pairs) = PublicKey
   all privKey: PrivateKey | {one pubKey: PublicKey | privKey->pubKey in KeyPairs.pairs}
   all priv1: PrivateKey | all priv2: PrivateKey - priv1 | all pub: PublicKey | priv1->pub in KeyPairs.pairs implies priv2->pub not in KeyPairs.pairs
+
+  -- at most one long-term key per (ordered) pair of names
+  all a:name, b:name | lone getLTK[a,b]
 }
 
 pred exploit_search {
