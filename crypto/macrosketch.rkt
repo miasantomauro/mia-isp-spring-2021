@@ -254,7 +254,7 @@
   ;(printf "ast-event-contents ev: ~a~n" (ast-event-contents ev))
   ; First, assert temporal ordering on this message variable; msg happens strictly after prev-msg unless no prev-msg
   #`(and #,(if prev-msg
-               #`(in (join #,msg sendTime) (join #,prev-msg (^ sendTime)))
+               #`(in (join #,msg sendTime) (join #,prev-msg sendTime (^ next)))
                #`true)
 
          ; Assert event constraints
@@ -282,9 +282,9 @@
          ; The somes won't get added for non-constructor terms, right?
          ; ** Create var names in parent, so that we can say their union = the contents **
          
-         ;;;;;;
-                  
-         #,(build-subterm-list-constraints pname rname msg #'data this-strand (ast-event-contents ev))))
+         ;;;;;;          
+         #,(build-subterm-list-constraints pname rname msg #'data this-strand (ast-event-contents ev))
+         ))
 
 ; Assume that values are just strand-local.
 ; TODO: prevent match if unable to read within a term, unless mesg type
@@ -630,8 +630,8 @@
 
 (set-option! 'verbose 5)
 (set-option! 'solver 'MiniSatProver)
-(set-option! 'logtranslation 1)
-(set-option! 'coregranularity 1)
+(set-option! 'logtranslation 2)
+(set-option! 'coregranularity 2)
 (set-option! 'core_minimization 'rce)
 
 (run NS_SAT
@@ -649,7 +649,7 @@
                (Key 6 6)
                (name 3 3)
                (KeyPairs 1 1)
-               (Timeslot 6 6)
+               (Timeslot 6 6) ; TODO: for opt, consider merge with Message?
                (Message 6 6) ; not "mesg"
                (text 2 2)
                (Ciphertext 5 5)
