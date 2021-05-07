@@ -15,38 +15,39 @@
                      racket/syntax))
 
 
-; For debugging speed, don't import the full spec yet
-(sig Message) ; NOT CPSA's "mesg" sort
-(sig Timeslot)
-(relation next (Timeslot Timeslot))
-(sig mesg)
-(sig name #:extends mesg)
-(sig text #:extends mesg)
-
 ; TODO: break 1-1 between name and Strand
 ; TODO: mesg type for OR (just rename datum?)
 
-(sig KeyPairs #:one)
-(sig Ciphertext #:extends mesg)
-(sig Key #:extends mesg)
-(sig PrivateKey #:extends Key)
-(sig PublicKey #:extends Key)
-(sig skey #:extends Key) ; symmetric, e.g. LTK
-(relation sendTime (Message Timeslot))
-(relation data (Message mesg))
-(relation sender (Message name))
-(relation receiver (Message name))
-(relation encryptionKey (Ciphertext Key))
- ;pairs: set PrivateKey -> PublicKey,
- ;owners: set PrivateKey -> name
-(relation pairs (KeyPairs PrivateKey PublicKey))
-(relation ltks (KeyPairs name name skey))
-(relation owners (KeyPairs PrivateKey name))
-(relation plaintext (Ciphertext mesg))
-(relation generated_times (name mesg Timeslot))
 
-; TODO: swap above with the below, once finalized
-;(require "current_model.rkt") ; the base crypto modl
+; For debugging speed, don't import the full spec yet
+;(sig Message) ; NOT CPSA's "mesg" sort
+;(sig Timeslot)
+;(relation next (Timeslot Timeslot))
+;(sig mesg)
+;(sig name #:extends mesg)
+;(sig text #:extends mesg)
+;
+;
+;(sig KeyPairs #:one)
+;(sig Ciphertext #:extends mesg)
+;(sig Key #:extends mesg)
+;(sig PrivateKey #:extends Key)
+;(sig PublicKey #:extends Key)
+;(sig skey #:extends Key) ; symmetric, e.g. LTK
+;(relation sendTime (Message Timeslot))
+;(relation data (Message mesg))
+;(relation sender (Message name))
+;(relation receiver (Message name))
+;(relation encryptionKey (Ciphertext Key))
+; ;pairs: set PrivateKey -> PublicKey,
+; ;owners: set PrivateKey -> name
+;(relation pairs (KeyPairs PrivateKey PublicKey))
+;(relation ltks (KeyPairs name name skey))
+;(relation owners (KeyPairs PrivateKey name))
+;(relation plaintext (Ciphertext mesg))
+;(relation generated_times (name mesg Timeslot))
+
+(require "base.rkt") ; the base crypto model
 
 ; First, define some syntax classes to ease parsing and improve errors.
 ; Syntax classes can expose custom attributes, which make them easier to process.
@@ -498,10 +499,6 @@
 ;  (let* ([all-sigs (forge:State-sigs forge:curr-state)]
 ;         [role-sigs (filter (lambda (s) (equal? 'name (forge:Sig-extends s))) all-sigs)])
 
-; TODO: import
-(pred (originates strand value)
-      (not (in strand value)))
-
 (define-for-syntax (build-skeleton-strand-constraints pname skelesig skeleton-idx strand-ast strand-idx)  
   (let* ([this-strand (format-id #'skelesig "~a_strand~a" skelesig strand-idx)]
          [strand-role (ast-strand-role strand-ast)]
@@ -637,15 +634,15 @@
 (set-option! 'coregranularity 1)
 (set-option! 'core_minimization 'rce)
 
-(sig Attacker #:extends name)
-
-; THIS IS UNSAT BECAUSE WE HAVE YET TO IMPORT THE CORRECT ORIGINATION PREDICATE
-
 (run NS_SAT
       #:preds [
-               ;exec_ns_init
-               ;exec_ns_resp
+               exec_ns_init
+               exec_ns_resp
                constrain_skeleton_ns_0
+               constrain_skeleton_ns_1
+               temporary
+               wellformed
+               exploit_search
                ]
       #:bounds [(is next linear)]
       #:scope [(mesg 16)
@@ -670,3 +667,5 @@
 
 ; This will auto-highlight if settings are correct
 ; (tree:get-value (forge:Run-result NS_SAT))
+
+(is-sat? NS_SAT)
