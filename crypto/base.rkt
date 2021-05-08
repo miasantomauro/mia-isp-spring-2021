@@ -90,6 +90,7 @@ pred wellformed {
 					c.encryptionKey in (a.learned_times).(Timeslot - t.^next)}}
     or
     -- d is a plaintext of the ciphertext which the name has access to the key encrypted using a publicKey
+    -- TODO: allow opening if encrypted with any key, just need to change the lookup
     {some m: Message | {some c: Ciphertext | 
 					m.receiver = a and
 					c in m.data and 
@@ -104,13 +105,14 @@ pred wellformed {
     or
     -- name knows the private keys it owns
     {d in PrivateKey and a = d.(KeyPairs.owners)}
-    -- name is a party to a long-term key
+    -- name knows long-term keys they are party to
     {some a2 : name - a | d in getLTK[a, a2] + getLTK[a2, a] }
     or
-    -- name can encrypt things
+    -- name can encrypt things they know with a key they know
     {d in Ciphertext and 
-	d.encryptionKey in (a.learned_times).(Timeslot - t.^next) and 
-	{all a: d.plaintext | a not in Ciphertext} and 
+	d.encryptionKey in (a.learned_times).(Timeslot - t.^next) and
+        -- removed to allow nested encryption
+	--{all a: d.plaintext | a not in Ciphertext} and 
 	d.plaintext in (a.learned_times).(Timeslot - t.^next)}
     or
     -- names know their own names
@@ -134,32 +136,13 @@ pred wellformed {
 
   all c: Ciphertext | some c.plaintext
 
-  (KeyPairs.pairs).PublicKey = PrivateKey
-  PrivateKey.(KeyPairs.pairs) = PublicKey
-  all privKey: PrivateKey | {one pubKey: PublicKey | privKey->pubKey in KeyPairs.pairs}
+  (KeyPairs.pairs).PublicKey = PrivateKey -- total
+  PrivateKey.(KeyPairs.pairs) = PublicKey -- total
+  all privKey: PrivateKey | {one pubKey: PublicKey | privKey->pubKey in KeyPairs.pairs} -- uniqueness
   all priv1: PrivateKey | all priv2: PrivateKey - priv1 | all pub: PublicKey | priv1->pub in KeyPairs.pairs implies priv2->pub not in KeyPairs.pairs
 
   -- at most one long-term key per (ordered) pair of names
   all a:name, b:name | lone getLTK[a,b]
-}
-
-pred exploit_search {
- /* some t: text | 
-  some c: Ciphertext | 
-  some m: Message | 
-  some t2: text - t | 
-  some c2: Ciphertext - c | 
-  some m2: Message - m | 
-  {
-    m.data = c and
-    t in c.plaintext and
-    t in (Attacker.learned_times).Timeslot and
-
-    m2.data = c2 and
-    t2 in c2.plaintext and
-    t2 in (Attacker.learned_times).Timeslot
-  }*/
-
 }
 
 pred temporary {
