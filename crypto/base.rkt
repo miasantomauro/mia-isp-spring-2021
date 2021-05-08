@@ -105,6 +105,7 @@ pred wellformed {
     or
     -- name knows the private keys it owns
     {d in PrivateKey and a = d.(KeyPairs.owners)}
+    or
     -- name knows long-term keys they are party to
     {some a2 : name - a | d in getLTK[a, a2] + getLTK[a2, a] }
     or
