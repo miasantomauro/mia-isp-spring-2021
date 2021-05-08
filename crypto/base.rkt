@@ -104,6 +104,8 @@ pred wellformed {
     or
     -- name knows the private keys it owns
     {d in PrivateKey and a = d.(KeyPairs.owners)}
+    -- name is a party to a long-term key
+    {some a2 : name - a | d in getLTK[a, a2] + getLTK[a2, a] }
     or
     -- name can encrypt things
     {d in Ciphertext and 
