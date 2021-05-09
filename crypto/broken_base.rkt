@@ -272,7 +272,7 @@ pred ns_execution {
       -- encrypted with public key of whoever is locally "b"
       -- recall "owners" takes us to private key, and then lookup in pairs
       m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_b)]
-      --m0.receiver = resp
+      m0.receiver = resp
   --       (send (enc n1 n2 (pubk a)))
       m1.data.plaintext = resp.resp_n1 + resp.resp_n2     
       one m1.data
