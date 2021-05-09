@@ -32,7 +32,7 @@ sig Timeslot {
 }
 
 -- As names are sent messagest, they learn pieces of data --
-abstract sig name extends mesg {
+sig name extends mesg {
   learned_times: set mesg -> Timeslot,
   generated_times: set text -> Timeslot
 }
@@ -41,9 +41,9 @@ sig strand {
   -- the name associated with this strand
   agent: one name
 }
+one sig AttackerStrand extends strand {}
 
-one sig Attacker extends name {
-}
+one sig Attacker extends name {}
 
 sig Ciphertext extends mesg {
    encryptionKey: one Key,
@@ -149,6 +149,9 @@ pred wellformed {
 
   -- at most one long-term key per (ordered) pair of names
   all a:name, b:name | lone getLTK[a,b]
+
+  -- Attacker's strand
+  AttackerStrand.agent = Attacker
 }
 
 fun subterm[supers: set mesg]: set mesg {
@@ -200,13 +203,13 @@ pred generates[a: name, d: mesg] {
            (recv (enc n2 (pubk b))))))
 */
 
-sig Init extends name {
+sig Init extends strand {
   -- variables for an init strand:
   init_a, init_b: one name, -- alias for Name
   init_n1, init_n2: one text 
 }
 
-sig Resp extends name {
+sig Resp extends strand {
   -- variables for a resp strand:
   resp_a, resp_b: one name, -- alias for Name
   resp_n1, resp_n2: one text
@@ -239,7 +242,7 @@ pred ns_execution {
       m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
       m0.sender = init
       init.init_b not in init
-      init.init_a = init
+      --init.init_a = init
   --         (recv (enc n1 n2 (pubk a)))
       m1.data.plaintext = init.init_n1 + init.init_n2    
       init.init_n1 not in init.init_n2 
@@ -269,7 +272,7 @@ pred ns_execution {
       -- encrypted with public key of whoever is locally "b"
       -- recall "owners" takes us to private key, and then lookup in pairs
       m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_b)]
-      m0.receiver = resp
+      --m0.receiver = resp
   --       (send (enc n1 n2 (pubk a)))
       m1.data.plaintext = resp.resp_n1 + resp.resp_n2     
       one m1.data
@@ -402,6 +405,11 @@ all p: PrivateKey | one p.(KeyPairs.owners)
 -- 2 publickey, 3 ciphertext, 3 agent
 -- Sigs that we have: Datum, Key, PrivateKey, PublicKey, SymmetricKey, Agent, Attacker, Ciphertext, Text, Message, Timeslot, KeyPairs
 
+option verbose 5
+option solver MiniSatProver
+option logtranslation 1
+option coregranularity 1
+option core_minimization rce
 
 run {
   temporary
@@ -418,7 +426,8 @@ run {
 			exactly 3 PublicKey, 
 			exactly 0 skey, 
 			exactly 1 Init, 
-			exactly 1 Resp, 
+			exactly 1 Resp,
+                        exactly 3 strand,
 			exactly 1 Attacker, 
 			exactly 5 Ciphertext, 
 			exactly 2 text,
