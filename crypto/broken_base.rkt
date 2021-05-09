@@ -151,23 +151,6 @@ pred wellformed {
   all a:name, b:name | lone getLTK[a,b]
 }
 
-pred temporary {
-  -- upper bounds for one sig have size > 1 at the moment; fix
-  one Attacker
-
-  -- for checking, debugging:
-  all a1, a2: name | { 
-    -- If one has a key, keys are different
-    (some KeyPairs.owners.a1 and a1 != a2) implies 
-      (KeyPairs.owners.a1 != KeyPairs.owners.a2)
-  }
- 
-all p: PrivateKey | one p.(KeyPairs.owners) 
-
-  -- number of keys greater than 0
-  #Key > 0
-}
-
 fun subterm[supers: set mesg]: set mesg {
   -- VITAL: if you add a new subterm relation, needs to be added here, too!
   supers +
@@ -197,7 +180,229 @@ pred generates[a: name, d: mesg] {
   some (a.generated_times)[d]
 }
 
+
+-- NS AS PREDICATES STARTS HERE --
+----------------------------------------------------------------------
+
+----- PROTOCOL DEFN -----
+
 /*
+  (defprotocol ns basic
+  (defrole init
+    (vars (a b name) (n1 n2 text))
+    (trace (send (enc n1 a (pubk b)))
+           (recv (enc n1 n2 (pubk a)))
+           (send (enc n2 (pubk b)))))
+  (defrole resp 
+    (vars (a b name) (n1 n2 text))
+    (trace (recv (enc n1 a (pubk b)))
+           (send (enc n1 n2 (pubk a)))
+           (recv (enc n2 (pubk b))))))
+*/
+
+sig Init extends name {
+  -- variables for an init strand:
+  init_a, init_b: one name, -- alias for Name
+  init_n1, init_n2: one text 
+}
+
+sig Resp extends name {
+  -- variables for a resp strand:
+  resp_a, resp_b: one name, -- alias for Name
+  resp_n1, resp_n2: one text
+}
+
+pred ns_execution {
+  
+  -- We are conflating 'role' and 'strand' somewhat, although
+  -- we think it is safe, since 'role' is embodied as a sig, and 
+  --   a strand is an atom of that role
+  -- ASSUMPTION: strands have exactly one role
+  -- ASSUMPTION: not interested in instances where protocol execution is incomplte
+  --    (we enforce all strands to observe their full trace)
+
+  all init: Init | {  
+    some m0: Message | 
+    some m1: Message - m0 | 
+    some m2: Message - m1 - m0 | {  
+
+      m1.sendTime in m0.sendTime.^next
+      m2.sendTime in m1.sendTime.^next
+
+  --  (trace (send (enc n1 a (pubk b)))
+      -- contains local values for "a" and "n1"
+      m0.data.plaintext = init.init_a + init.init_n1
+
+      one m0.data
+      -- encrypted with public key of whoever is locally "b"
+      -- recall "owners" takes us to private key, and then lookup in pairs
+      m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
+      m0.sender = init
+      init.init_b not in init
+      init.init_a = init
+  --         (recv (enc n1 n2 (pubk a)))
+      m1.data.plaintext = init.init_n1 + init.init_n2    
+      init.init_n1 not in init.init_n2 
+      one m1.data
+      m1.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_a)]
+      m1.receiver = init
+  --         (send (enc n2 (pubk b)))))
+      m2.data.plaintext = init.init_n2   
+      one m2.data   
+      m2.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
+      m2.sender = init    
+    }      
+  }
+
+  all resp: Resp | {  
+    some m0: Message | 
+    some m1: Message - m0 | 
+    some m2: Message - m1 - m0 | {  
+
+      m1.sendTime in m0.sendTime.^next
+      m2.sendTime in m1.sendTime.^next
+
+    --(trace (recv (enc n1 a (pubk b)))                
+      -- contains local values for "a" and "n1"
+      m0.data.plaintext = resp.resp_a + resp.resp_n1
+      one m0.data
+      -- encrypted with public key of whoever is locally "b"
+      -- recall "owners" takes us to private key, and then lookup in pairs
+      m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_b)]
+      m0.receiver = resp
+  --       (send (enc n1 n2 (pubk a)))
+      m1.data.plaintext = resp.resp_n1 + resp.resp_n2     
+      one m1.data
+      m1.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_a)]
+      m1.sender = resp
+  --        (recv (enc n2 (pubk b))))))
+      m2.data.plaintext = resp.resp_n2 
+      one m2.data     
+      m2.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(resp.resp_b)]
+      m2.receiver = resp
+      resp.resp_a not in resp.resp_b
+      
+    }      
+  }
+}
+
+----- SKELETON DEFNS -----
+
+/*
+(defskeleton ns
+ (vars (b name) (n1 text))
+ ; ASSUME: 2nd "b" is referring to the variable declared line above
+ ; ASSUME: 1st "b" is referring to the variable declared in defrole of protocol
+;;; The initiator point-of-view
+(defskeleton ns
+  (vars (a b name) (n1 text))
+  (defstrand init 3 (a a) (b b) (n1 n1))
+  (non-orig (privk b) (privk a))
+  (uniq-orig n1)
+  (comment "Initiator point-of-view"))
+
+;;; The responder point-of-view
+(defskeleton ns
+  (vars (a b name) (n2 text))
+  (defstrand resp 3 (a a) (b b) (n2 n2))
+  (non-orig (privk a) (privk b))
+  (uniq-orig n2)
+  (comment "Responder point-of-view"))
+*/
+-- TODO: look at defskeleton and defstrand docs
+--  what is the (b b)? ANSWER: this is defining the variable b in the role to the *value* of b
+--  why say "3" there if init/resp traces have 3 messages each?  This is the max height.  You could not put more than 3 here, but you can put less than 3
+
+-- Assume: defskeleton ns: the strands herein are NS roles
+-- Assume: defstrand init ... is talking about a specific init strand
+
+-- First cut
+abstract sig SkeletonNS {}
+one sig SkeletonNS_0 extends SkeletonNS {
+  s0_a: one name,
+  s0_b: one name,
+  s0_n1: one text,
+  strand0_0: one Init
+}
+one sig SkeletonNS_1 extends SkeletonNS {
+  s1_a: one name,
+  s1_b: one name,
+  s1_n2: one text,
+  strand1_0: one Resp
+}
+
+pred constrain_skeletonNS_0 {
+  -- (defstrand init 3 (a a) (b b) (n1 n1))
+  SkeletonNS_0.strand0_0.init_a = SkeletonNS_0.s0_a
+  SkeletonNS_0.strand0_0.init_b = SkeletonNS_0.s0_b
+  SkeletonNS_0.strand0_0.init_n1 = SkeletonNS_0.s0_n1
+  
+  -- (non-orig (privk b) (privk a))
+  -- (uniq-orig n1)
+  -- ASSUME: meaning of these operators is correct ; it is likely not quite
+  --   do we, e.g., need to also assume that the generation EXISTS for unique?
+
+  all a: name - SkeletonNS_0.strand0_0 | 
+    SkeletonNS_0.s0_n1 not in a.generated_times.Timeslot
+}
+pred constrain_skeletonNS_1 {
+  -- (defstrand resp 3 (a a) (b b) (n2 n2))
+  SkeletonNS_1.strand1_0.resp_a = SkeletonNS_1.s1_a
+  SkeletonNS_1.strand1_0.resp_b = SkeletonNS_1.s1_b
+  SkeletonNS_1.strand1_0.resp_n2 = SkeletonNS_1.s1_n2
+
+  -- (non-orig (privk b) (privk a))
+  -- (uniq-orig n2)
+
+  all a: name - SkeletonNS_1.strand1_0 | 
+    SkeletonNS_1.s1_n2 not in a.generated_times.Timeslot
+}
+
+-- Don't expect skeleton defns to be displayed; they are probably invisible
+-- structure that constrains the instance found.
+
+pred exploit_search {
+  some t: text | 
+  some c: Ciphertext | 
+  some m: Message | 
+  some t2: text - t | 
+  some c2: Ciphertext - c | 
+  some m2: Message - m | 
+  {
+    m.data = c and
+    t in c.plaintext and
+    t in (Attacker.learned_times).Timeslot and
+
+    m2.data = c2 and
+    t2 in c2.plaintext and
+    t2 in (Attacker.learned_times).Timeslot
+  }
+
+}
+
+pred temporary {
+  -- upper bounds for one sig have size > 1 at the moment; fix
+  one Attacker
+
+  -- for checking, debugging:
+  all a1, a2: name | { 
+    -- If one has a key, keys are different
+    (some KeyPairs.owners.a1 and a1 != a2) implies 
+      (KeyPairs.owners.a1 != KeyPairs.owners.a2)
+  }
+ 
+all p: PrivateKey | one p.(KeyPairs.owners) 
+
+  -- number of keys greater than 0
+  #Key > 0
+}
+
+
+
+-- 2 publickey, 3 ciphertext, 3 agent
+-- Sigs that we have: Datum, Key, PrivateKey, PublicKey, SymmetricKey, Agent, Attacker, Ciphertext, Text, Message, Timeslot, KeyPairs
+
+
 run {
   temporary
   wellformed
@@ -221,4 +426,3 @@ run {
  			exactly 6 Timeslot, 
 			exactly 1 KeyPairs, 
 			exactly 3 name for {next is linear}
-*/
