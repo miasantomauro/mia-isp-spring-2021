@@ -513,7 +513,7 @@ function render() {
                     .attr('id', ts + a);
             
                 // append the rect
-                g.append('rect')
+                const r = g.append('rect')
                     .attr('x', boxX)
                     .attr('y', boxY)
                     .attr('width', boxWidth)
@@ -563,20 +563,18 @@ function render() {
                 console.log("OLD INFO");
                 console.log(oldInfo);*/
 
-                // id="rectWrap" class="wrap" y="50px" font-size="12"
-                const textId = `box${a}${ts}`;
                 g.append('text')
-                    .attr('id', textId)
+                    .attr('x', boxX)
+                    .attr('y', boxY)
                     .attr('class', 'wrap')
                     .style('font-family', '"Open Sans", sans-serif')
-                    .style('fill', BLACK)
+                    .style('fill', RED)
                     .text(newInfo);
 
+                const wrap = d3textwrap.textwrap().bounds({width: boxWidth, height: boxHeight});
+                d3.selectAll('.wrap').call(wrap);
 
-                d3plus.textWrap()
-                    .container(d3.select(`#${textId}`))
-                    .draw();
-    
+                // TODO: calculate the resulting height and offset the next group of information
                 
             } else {
                 // remove the group if this timeslot is not supposed to be visible
@@ -588,3 +586,4 @@ function render() {
 }
 
 render();
+
