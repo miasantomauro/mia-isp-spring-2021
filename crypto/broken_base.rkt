@@ -27,8 +27,7 @@ fun getLTK[name_a: name, name_b: name]: one skey {
 }
 
 fun getInv[k: (PrivateKey + PublicKey)]: one Key {
-k
---k in PublicKey => ((KeyPairs.pairs).k) else (k.(KeyPairs.pairs))
+k in PublicKey => ((KeyPairs.pairs).k) else (k.(KeyPairs.pairs))
 }
 
 
@@ -104,7 +103,7 @@ pred wellformed {
         c in (a.learned_times).(Timeslot - t.^next) and 
         d in c.plaintext and 
         c.encryptionKey in (PublicKey + PrivateKey) and 
-        getInv[KeyPairs.pairs.(c.encryptionKey)] in (a.learned_times).(Timeslot - t.^next)}
+        getInv[c.encryptionKey] in (a.learned_times).(Timeslot - t.^next)}
     or 
     -- name knows all public keys
     {d in PublicKey}
