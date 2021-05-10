@@ -362,7 +362,7 @@ pred constrain_skeletonNS_1 {
 -- structure that constrains the instance found.
 
 pred exploit_search {
-  some t: text | 
+  /*some t: text | 
   some c: Ciphertext | 
   some m: Message | 
   some t2: text - t | 
@@ -376,8 +376,16 @@ pred exploit_search {
     m2.data = c2 and
     t2 in c2.plaintext and
     t2 in (Attacker.learned_times).Timeslot
-  }
+  }*/
 
+  (Init.init_n1 + Init.init_n2) in Attacker.learned_times.Timeslot
+  Init.init_n1 not in Attacker.generated_times.Timeslot
+  Init.init_n2 not in Attacker.generated_times.Timeslot
+
+  Init.init_a = Init.agent
+  Resp.resp_b = Resp.agent
+
+  Init.init_n1 != Init.init_n2     
 }
 
 pred temporary {
