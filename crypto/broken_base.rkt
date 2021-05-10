@@ -26,6 +26,12 @@ fun getLTK[name_a: name, name_b: name]: one skey {
   (KeyPairs.ltks)[name_a][name_b]
 }
 
+fun getInv[k: (PrivateKey + PublicKey)]: one Key {
+k
+--k in PublicKey => ((KeyPairs.pairs).k) else (k.(KeyPairs.pairs))
+}
+
+
 -- t=0, t=1, ...
 sig Timeslot {
   next: lone Timeslot
@@ -89,17 +95,17 @@ pred wellformed {
     {some c: Ciphertext | 
         c in (a.learned_times).(Timeslot - t.^next) and 
         d in c.plaintext and 
-        --c.encryptionKey in skey and
+        c.encryptionKey in skey and
         -- Either pub/priv keypair OR a LTK (symmetric)
         (KeyPairs.pairs.(c.encryptionKey) + c.encryptionKey)
         in (a.learned_times).(Timeslot - t.^next)}
     or
---    {some c: Ciphertext | 					
---        c in (a.learned_times).(Timeslot - t.^next) and 
---        d in c.plaintext and 
---       -- c.encryptionKey in PublicKey and 
---       KeyPairs.pairs.(c.encryptionKey) in (a.learned_times).(Timeslot - t.^next)}
---    or 
+    {some c: Ciphertext | 					
+        c in (a.learned_times).(Timeslot - t.^next) and 
+        d in c.plaintext and 
+        c.encryptionKey in (PublicKey + PrivateKey) and 
+        getInv[KeyPairs.pairs.(c.encryptionKey)] in (a.learned_times).(Timeslot - t.^next)}
+    or 
     -- name knows all public keys
     {d in PublicKey}
     or
