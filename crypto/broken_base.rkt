@@ -84,27 +84,22 @@ pred wellformed {
     -- They received the message
     {{some m: Message | {d in m.data and t = m.sendTime and m.receiver.agent = a}}
     or 
-    -- d can be the plaintext of a ciphertext encrypted using a symmetric key which the name has access to the key
-    {some m: Message | {some c: Ciphertext | 
-					m.receiver.agent = a and
-					c in m.data and 
-					m.sendTime = t and
-					c in (a.learned_times).(Timeslot - t.^next) and 
-					d in c.plaintext and 
-					c.encryptionKey in skey and 
-					c.encryptionKey in (a.learned_times).(Timeslot - t.^next)}}
+    -- d can be the plaintext of a currently-known ciphertext
+    --   encrypted using a currently-known key (regardless of the timeslot's message)
+    {some c: Ciphertext | 
+        c in (a.learned_times).(Timeslot - t.^next) and 
+        d in c.plaintext and 
+        --c.encryptionKey in skey and
+        -- Either pub/priv keypair OR a LTK (symmetric)
+        (KeyPairs.pairs.(c.encryptionKey) + c.encryptionKey)
+        in (a.learned_times).(Timeslot - t.^next)}
     or
-    -- d is a plaintext of the ciphertext which the name has access to the key encrypted using a publicKey
-    -- TODO: allow opening if encrypted with any key, just need to change the lookup
-    {some m: Message | {some c: Ciphertext | 
-					m.receiver.agent = a and
-					c in m.data and 
-					m.sendTime = t and
-					c in (a.learned_times).(Timeslot - t.^next) and 
-					d in c.plaintext and 
-					c.encryptionKey in PublicKey and 
-					KeyPairs.pairs.(c.encryptionKey) in (a.learned_times).(Timeslot - t.^next)}}
-    or 
+--    {some c: Ciphertext | 					
+--        c in (a.learned_times).(Timeslot - t.^next) and 
+--        d in c.plaintext and 
+--       -- c.encryptionKey in PublicKey and 
+--       KeyPairs.pairs.(c.encryptionKey) in (a.learned_times).(Timeslot - t.^next)}
+--    or 
     -- name knows all public keys
     {d in PublicKey}
     or
@@ -114,13 +109,13 @@ pred wellformed {
     or
     {some a2 : name - a | d in getLTK[a, a2] + getLTK[a2, a] }
     or
-    -- name can encrypt things they know with a key they know
+    -- name can *encrypt* things they know with a key they know
     {d in Ciphertext and 
 	d.encryptionKey in (a.learned_times).(Timeslot - t.^next) and
         -- removed to allow nested encryption
 	--{all a: d.plaintext | a not in Ciphertext} and 
 	d.plaintext in (a.learned_times).(Timeslot - t.^next)}
-    or
+    or 
     -- names know their own names
     {d = a}
     or
@@ -134,7 +129,7 @@ pred wellformed {
   -- Messages comprise only values known by the sender
   all m: Message | m.data in (((m.sender).agent).learned_times).(Timeslot - (m.sendTime).^next) 
 
-  all m: Message | m.sender = Attacker or m.receiver.agent = Attacker 
+  all m: Message | m.sender = AttackerStrand or m.receiver = AttackerStrand 
 
   -- plaintext relation is acyclic  
   --  NOTE WELL: if ever add another type of mesg that contains data, + inside ^.
@@ -345,8 +340,10 @@ pred constrain_skeletonNS_0 {
   -- ASSUME: meaning of these operators is correct ; it is likely not quite
   --   do we, e.g., need to also assume that the generation EXISTS for unique?
 
-  all a: name - SkeletonNS_0.strand0_0 | 
+  all a: name - SkeletonNS_0.strand0_0.agent | 
     SkeletonNS_0.s0_n1 not in a.generated_times.Timeslot
+
+-- TODO: never re-wrote non-orig for this
 }
 pred constrain_skeletonNS_1 {
   -- (defstrand resp 3 (a a) (b b) (n2 n2))
@@ -357,7 +354,7 @@ pred constrain_skeletonNS_1 {
   -- (non-orig (privk b) (privk a))
   -- (uniq-orig n2)
 
-  all a: name - SkeletonNS_1.strand1_0 | 
+  all a: name - SkeletonNS_1.strand1_0.agent |  -- good example of why we want types
     SkeletonNS_1.s1_n2 not in a.generated_times.Timeslot
 }
 
@@ -393,8 +390,12 @@ pred temporary {
     (some KeyPairs.owners.a1 and a1 != a2) implies 
       (KeyPairs.owners.a1 != KeyPairs.owners.a2)
   }
- 
-all p: PrivateKey | one p.(KeyPairs.owners) 
+
+  -- TODO move some of these into the wellformedness pred
+  
+  all p: PrivateKey | one p.(KeyPairs.owners) 
+
+  agent.Attacker = AttackerStrand
 
   -- number of keys greater than 0
   #Key > 0
@@ -409,7 +410,7 @@ option verbose 5
 option solver MiniSatProver
 option logtranslation 1
 option coregranularity 1
-option core_minimization rce
+option core_minimization hybrid
 
 run {
   temporary
@@ -428,7 +429,8 @@ run {
 			exactly 1 Init, 
 			exactly 1 Resp,
                         exactly 3 strand,
-			exactly 1 Attacker, 
+			exactly 1 Attacker,
+                        exactly 1 AttackerStrand,
 			exactly 5 Ciphertext, 
 			exactly 2 text,
 			exactly 6 Message,
