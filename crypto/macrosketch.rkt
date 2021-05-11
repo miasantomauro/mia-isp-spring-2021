@@ -373,13 +373,13 @@
       #`(all ([rv #,rolesig])
              (&&
               ; sometimes non-orig etc. appear in role definition
-              ;#,@(build-role-orig-constraints #'rv pname rname rolesig role-decls vars)
+              #,@(build-role-orig-constraints #'rv pname rname rolesig role-decls vars)
               ; enforce that every variable is populated uniquely
               #,@(for/list ([vt (ast-vars-assoc-decls vars)])
                    (let ([v (first vt)])                     
                      #`(one (join rv #,(id->strand-var pname rname v))))) 
               ; trace assertions
-              #;(some (#,@msg-var-decls)
+              (some (#,@msg-var-decls)
                     (&&                                        
                      #,@(for/list ([ev (ast-trace-events a-trace)]
                                    [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])

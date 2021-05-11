@@ -26,11 +26,11 @@ one sig KeyPairs {
   ltks: set name -> name -> skey
 }
 
-fun getLTK[name_a: name, name_b: name]: one skey {
+fun getLTK[name_a: name, name_b: name]: lone skey {
   (KeyPairs.ltks)[name_a][name_b]
 }
 
-fun getInv[k: (PrivateKey + PublicKey)]: one Key {
+fun getInv[k: Key]: one Key {
   (k in PublicKey => ((KeyPairs.pairs).k) else (k.(KeyPairs.pairs)))
   +
   (k in skey => k else none)

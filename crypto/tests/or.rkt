@@ -47,38 +47,40 @@
                wellformed               
                ]
       #:bounds [(is next linear)]
-      #:scope [(mesg 0 21) ; (9 Key (??) + 4 name + 5 cipher + 3 text) -- except *21* in bound?
-               (Key 0 9)
-               (name 0 4)
-               (KeyPairs 1 1)
+      #:scope [(KeyPairs 1 1)
+               (Timeslot 9 9) ; should only need 8; testing unused timeslots
+               (Message 9 9)
                
-               ;(Timeslot 0 6) ; DEBUGGING TEST
-               ;(Message 0 6)
+               (mesg 20) ; 9 + 3 + 3 + 5
                
-               (Timeslot 8 8) ; TODO: for opt, consider merge with Message?
-               (Message 8 8) ; not "mesg" ; right now we're doubling up
-               (text 0 3)
+               (Key 9)
+               (akey 6)               
+               (PrivateKey 3)
+               (PublicKey 3)
+               (skey 3)
                
-               (Ciphertext 0 5)
+               (name 3)
                (Attacker 1 1)
+               
+               (text 3) ; includes data
+               
+               (Ciphertext 5 5)               
+               
+               (AttackerStrand 1 1)                              
                (or_init 1 1)
                (or_resp 1 1)
-               (or_serv 1 1) ; REPLACE THIS               
-               (PrivateKey 4 4) ;; NOTE changed this, was 3. (3 legit strands, 1 attacker)
-               (PublicKey 4 4)
-               (skey 0 3)               
-               (skeleton_or_0 1 1)
-              ; (Int 6 6) ; Needed due to upper bound
-               ;; -- unsure why needed here but not in NS
-               (Int 5 5) ; DO need to be able to count #Keys though
+               (or_serv 1 1) 
+               
+               (skeleton_or_0 1 1)              
+               (Int 5 5) 
                ]
       ;#:expect sat
       )
 
 ;(printf "~a~n" exec_or_serv)
 
-;(display OR_SAT)
-(is-sat? OR_SAT)
+(display OR_SAT)
+;(is-sat? OR_SAT)
 ; This will auto-highlight if settings are correct
 ; (tree:get-value (forge:Run-result NS_SAT))
 ;(is-sat? NS_SAT)
