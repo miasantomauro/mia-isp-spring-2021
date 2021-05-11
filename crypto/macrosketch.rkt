@@ -222,7 +222,7 @@
        (with-syntax ([rolesig (format-id #'pname "~a_~a" #'pname #'role.rname)])
          #`(begin
              ; subsig for agents having this role
-             (sig rolesig #:extends name) ; declare sig
+             (sig rolesig #:extends strand) ; declare sig
              ; variable fields of that subsig as declared            
              #,@(build-variable-fields (ast-role-vars rolestruct) #'pname (ast-role-rname rolestruct) #'rolesig)
              ; execution predicate for agents having this role
@@ -383,7 +383,9 @@
                                    [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
                           (let ([msg (format-id (ast-event-origstx ev) "msg~a" i)]
                                 [prev-msg (if (> i 0) (format-id (ast-event-origstx ev) "msg~a"  (- i 1)) #f)])
-                            (build-event-assertion pname rname #'rv ev msg prev-msg))))))))))
+                            (build-event-assertion pname rname #'rv ev msg prev-msg)))))
+              ))
+      )))
 
 
 (define-for-syntax (struct->name a-struct)

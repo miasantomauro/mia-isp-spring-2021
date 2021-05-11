@@ -26,31 +26,19 @@ fun getLTK[name_a: name, name_b: name]: one skey {
   (KeyPairs.ltks)[name_a][name_b]
 }
 
-fun getInv[k: (PrivateKey + PublicKey)]: one Key {
-  (k in PublicKey => ((KeyPairs.pairs).k) else (k.(KeyPairs.pairs)))
-  +
-  (k in skey => k else none)
-}
-
-
 -- t=0, t=1, ...
 sig Timeslot {
   next: lone Timeslot
 }
 
 -- As names are sent messagest, they learn pieces of data --
-sig name extends mesg {
+abstract sig name extends mesg {
   learned_times: set mesg -> Timeslot,
   generated_times: set text -> Timeslot
 }
 
-sig strand {
-  -- the name associated with this strand
-  agent: one name
+one sig Attacker extends name {
 }
-one sig AttackerStrand extends strand {}
-
-one sig Attacker extends name {}
 
 sig Ciphertext extends mesg {
    encryptionKey: one Key,
@@ -65,8 +53,8 @@ sig text extends mesg {}
 -- Note: this is NOT the same as "mesg"
 sig Message {
   -- Support delays, non-reception
-  sender: one strand,
-  receiver: one strand,
+  sender: one name,
+  receiver: one name,
   sendTime: one Timeslot,
   data: set mesg
 }
@@ -83,50 +71,51 @@ pred wellformed {
   -- someone cannot send a message to themselves
   all m: Message | m.sender not in m.receiver
   
-  -- names only learn information that associated strands are explicitly sent 
+  -- names only learn information that they are explicitly sent 
   all d: mesg | all t: Timeslot | all a: name | d->t in a.learned_times iff {
     -- they have not already learned the mesg -- 
     {d not in (a.learned_times).(Timeslot - t.*next)} and 
 
-    -- They received a message directly containing d (may be a ciphertext)
-    {{some m: Message | {d in m.data and t = m.sendTime and m.receiver.agent = a}}
+    -- They received the message
+    {{some m: Message | {d in m.data and t = m.sendTime and m.receiver = a}}
     or 
-
-    -- deconstruct encrypted term 
-    -- constrain time to reception to avoid cyclic justification of knowledge. e.g.,
-    --    "I know enc(other-agent's-private-key, pubk(me)) [from below via construct]"
-    --    "I know other-agent's-private-key [from above via deconstruct]""
-    -- instead: separate the two temporally: deconstruct on recv, construct on non-reception?
-    -- in that case, the cycle can't exist in the same timeslot
-    -- might think to write an accessibleSubterms function as below, except:
-    -- consider: (k1, enc(k2, enc(n1, invk(k2)), invk(k1)))
-    -- or, worse: (k1, enc(x, invk(k3)), enc(k2, enc(k3, invk(k2)), invk(k1)))
-    { {some m: Message | m.receiver.agent = a and m.sendTime = t}
-      {some c: Ciphertext | 
-        d in c.plaintext and 
-        c in (a.learned_times).(Timeslot - t.^next) and
-        getInv[c.encryptionKey] in (a.learned_times).(Timeslot - t.^next)
-      }
-    }
+    -- d can be the plaintext of a ciphertext encrypted using a symmetric key which the name has access to the key
+    {some m: Message | {some c: Ciphertext | 
+					m.receiver = a and
+					c in m.data and 
+					m.sendTime = t and
+					c in (a.learned_times).(Timeslot - t.^next) and 
+					d in c.plaintext and 
+					c.encryptionKey in skey and 
+					c.encryptionKey in (a.learned_times).(Timeslot - t.^next)}}
+    or
+    -- d is a plaintext of the ciphertext which the name has access to the key encrypted using a publicKey
+    -- TODO: allow opening if encrypted with any key, just need to change the lookup
+    {some m: Message | {some c: Ciphertext | 
+					m.receiver = a and
+					c in m.data and 
+					m.sendTime = t and
+					c in (a.learned_times).(Timeslot - t.^next) and 
+					d in c.plaintext and 
+					c.encryptionKey in PublicKey and 
+					KeyPairs.pairs.(c.encryptionKey) in (a.learned_times).(Timeslot - t.^next)}}
     or 
-    -- construct encrypted terms (only allow at NON-reception time; see above)
-    -- NOTE WELL: if ever allow an agent to send/receive at same time, need rewrite 
-    {d in Ciphertext and 
-	   d.encryptionKey in (a.learned_times).(Timeslot - t.^next) and        
-	   d.plaintext in (a.learned_times).(Timeslot - t.^next)
-     {no m: Message | m.receiver.agent = a and m.sendTime = t} -- non-reception
-     }
-    or 
-
     -- name knows all public keys
     {d in PublicKey}
     or
     -- name knows the private keys it owns
     {d in PrivateKey and a = d.(KeyPairs.owners)}
-    -- name knows long-term keys they are party to
     or
+    -- name knows long-term keys they are party to
     {some a2 : name - a | d in getLTK[a, a2] + getLTK[a2, a] }
-    or 
+    or
+    -- name can encrypt things they know with a key they know
+    {d in Ciphertext and 
+	d.encryptionKey in (a.learned_times).(Timeslot - t.^next) and
+        -- removed to allow nested encryption
+	--{all a: d.plaintext | a not in Ciphertext} and 
+	d.plaintext in (a.learned_times).(Timeslot - t.^next)}
+    or
     -- names know their own names
     {d = a}
     or
@@ -138,9 +127,9 @@ pred wellformed {
   all a: name | all d: text | lone t: Timeslot | d in (a.generated_times).t
 
   -- Messages comprise only values known by the sender
-  all m: Message | m.data in (((m.sender).agent).learned_times).(Timeslot - (m.sendTime).^next) 
+  all m: Message | m.data in ((m.sender).learned_times).(Timeslot - (m.sendTime).^next) 
 
-  all m: Message | m.sender = AttackerStrand or m.receiver = AttackerStrand 
+  all m: Message | m.sender = Attacker or m.receiver = Attacker 
 
   -- plaintext relation is acyclic  
   --  NOTE WELL: if ever add another type of mesg that contains data, + inside ^.
@@ -155,50 +144,6 @@ pred wellformed {
 
   -- at most one long-term key per (ordered) pair of names
   all a:name, b:name | lone getLTK[a,b]
-
-  -- Attacker's strand
-  AttackerStrand.agent = Attacker
-}
-
-fun subterm[supers: set mesg]: set mesg {
-  -- VITAL: if you add a new subterm relation, needs to be added here, too!
-  supers +
-  supers.^(plaintext) -- union on new subterm relations inside parens
-}
--- Problem: (k1, enc(k2, enc(n1, invk(k2)), invk(k1)))
---  Problem: (k1, enc(x, invk(k3)), enc(k2, enc(k3, invk(k2)), invk(k1)))
---    needs knowledge to grow on the way through the tree, possibly sideways
--- so this approach won't work
-/*fun accessibleSubterms[supers: set mesg, known: set mesg]: set mesg {
-  -- VITAL: ditto above 
-  -- plaintext: Ciphertext -> set mesg
-  -- set of Ciphertexts this agent can now open: 
-  let openable = {c: Ciphertext | getInv[c.encryptionKey] in known} |
-    supers + 
-    supers.^(plaintext & (openable -> mesg))
-}*/
-
--- Differs slightly in that a is a strand, not a node
-pred originates[a: name, d: mesg] {
-
-  -- unsigned term t originates on n in N iff
-  --   term(n) is positive and
-  --   t subterm of term(n) and
-  --   whenever n' precedes n on the same strand, t is not subterm of n'
-
-  some m: sender.agent.a | { -- messages sent by a (positive term)     
-      d in subterm[m.data] -- d is a sub-term of m     
-      all m2: (sender.agent.a + receiver.agent.a) - m | { -- everything else on the strand
-          -- ASSUME: messages are sent/received in same timeslot
-          {m2.sendTime in m.sendTime.^(~(next))}
-          implies          
-          {d not in subterm[m2.data]}
-      }
-  }
-}
-
-pred generates[a: name, d: mesg] {
-  some (a.generated_times)[d]
 }
 
 pred temporary {
@@ -211,29 +156,43 @@ pred temporary {
     (some KeyPairs.owners.a1 and a1 != a2) implies 
       (KeyPairs.owners.a1 != KeyPairs.owners.a2)
   }
-
-  -- TODO move some of these into the wellformedness pred
-  
-  all p: PrivateKey | one p.(KeyPairs.owners) 
-
-  agent.Attacker = AttackerStrand
+ 
+all p: PrivateKey | one p.(KeyPairs.owners) 
 
   -- number of keys greater than 0
   #Key > 0
 }
 
+fun subterm[supers: set mesg]: set mesg {
+  -- VITAL: if you add a new subterm relation, needs to be added here, too!
+  supers +
+  supers.^(plaintext) -- union on new subterm relations inside parens
+}
+
+-- Differs slightly in that a is a strand, not a node
+pred originates[a: name, d: mesg] {
+
+  -- unsigned term t originates on n in N iff
+  --   term(n) is positive and
+  --   t subterm of term(n) and
+  --   whenever n' precedes n on the same strand, t is not subterm of n'
+
+  some m: sender.a | { -- messages sent by a (positive term)     
+      d in subterm[m.data] -- d is a sub-term of m     
+      all m2: (sender.a + receiver.a) - m | { -- everything else on the strand
+          -- ASSUME: messages are sent/received in same timeslot
+          {m2.sendTime in m.sendTime.^(~(next))}
+          implies          
+          {d not in subterm[m2.data]}
+      }
+  }
+}
+
+pred generates[a: name, d: mesg] {
+  some (a.generated_times)[d]
+}
+
 /*
-
-
--- 2 publickey, 3 ciphertext, 3 agent
--- Sigs that we have: Datum, Key, PrivateKey, PublicKey, SymmetricKey, Agent, Attacker, Ciphertext, Text, Message, Timeslot, KeyPairs
-
-option verbose 5
-option solver MiniSatProver
-option logtranslation 1
-option coregranularity 1
-option core_minimization hybrid
-
 run {
   temporary
   wellformed
@@ -249,15 +208,12 @@ run {
 			exactly 3 PublicKey, 
 			exactly 0 skey, 
 			exactly 1 Init, 
-			exactly 1 Resp,
-                        exactly 3 strand,
-			exactly 1 Attacker,
-                        exactly 1 AttackerStrand,
+			exactly 1 Resp, 
+			exactly 1 Attacker, 
 			exactly 5 Ciphertext, 
 			exactly 2 text,
 			exactly 6 Message,
  			exactly 6 Timeslot, 
 			exactly 1 KeyPairs, 
 			exactly 3 name for {next is linear}
-
 */

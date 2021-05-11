@@ -38,39 +38,31 @@
 
 
 
-; Confirm
-;(hash-keys (forge:State-sigs forge:curr-state))
-;(hash-keys (forge:State-relations forge:curr-state))
-(hash-keys (forge:State-pred-map forge:curr-state))
-;(relation-typelist ns_init_a)
-;(relation-typelist skeleton_ns_0_n1)
-
-
- ;some t1, t2: text | {
- ;     t1 in (Attacker.learned_times).Timeslot
- ;     t2 in (Attacker.learned_times).Timeslot
- ;     t1 not in (Attacker.generated_times).Timeslot
- ;     t2 not in (Attacker.generated_times).Timeslot
- ; }
-
-; The attacker learns the initiator's n1 and n2
-; but the attacker generated neither
 (pred attack_exists
       (in (+ (join ns_init ns_init_n1)
              (join ns_init ns_init_n2))
-          (join Attacker learned_times Timeslot))
-      
+          (join Attacker learned_times Timeslot)))
+
+(pred success      
+      (in (+ (join ns_init ns_init_n1)
+             (join ns_init ns_init_n2))
+          (& (join (join ns_init agent) learned_times Timeslot)
+             (join (join ns_resp agent) learned_times Timeslot))))
+
+(pred attack_frame      
       (! (in (join ns_init ns_init_n1)             
              (join Attacker generated_times Timeslot)))
       (! (in (join ns_init ns_init_n2)             
              (join Attacker generated_times Timeslot)))
+
       ; Stopgap: initiator believes they are a, and responder believes they are b
-      (= (join ns_init ns_init_a) ns_init)            
-      (= (join ns_resp ns_resp_b) ns_resp)
+      (= (join ns_init ns_init_a) (join ns_init agent))
+      (= (join ns_resp ns_resp_b) (join ns_resp agent))
       
       ; Require the secrets to be different
       (! (= (join ns_init ns_init_n1)
             (join ns_init ns_init_n2))))
+
 
 (test ns_fixed_SAT
       #:preds [
@@ -80,7 +72,9 @@
                constrain_skeleton_ns_1
                temporary
                wellformed
-               ;attack_exists
+               (! attack_exists)
+               attack_frame
+               success
                ]
       #:bounds [(is next linear)]
       #:scope [(mesg 16)
@@ -91,18 +85,20 @@
                (Message 6 6) ; not "mesg"
                (text 2 2)
                (Ciphertext 5 5)
+               (AttackerStrand 1 1)
                (Attacker 1 1)
                (ns_init 1 1)
                (ns_resp 1 1)
                (PrivateKey 3 3)
                (PublicKey 3 3)
-               (skey 0 0)
+               (skey 0 3)
+               (strand 3 3)
                (skeleton_ns_0 1 1)
                (skeleton_ns_1 1 1)
                ]
       #:expect sat)
 
-(run ns_fixed_exploit_UNSAT
+(test ns_fixed_exploit_UNSAT
       #:preds [
                exec_ns_init
                exec_ns_resp
@@ -111,6 +107,8 @@
                temporary
                wellformed
                attack_exists
+               attack_frame
+               success
                ]
       #:bounds [(is next linear)]
       #:scope [(mesg 16)
@@ -121,17 +119,19 @@
                (Message 6 6) ; not "mesg"
                (text 2 2)
                (Ciphertext 5 5)
+               (AttackerStrand 1 1)
                (Attacker 1 1)
                (ns_init 1 1)
                (ns_resp 1 1)
                (PrivateKey 3 3)
                (PublicKey 3 3)
-               (skey 0 0)
+               (skey 0 3)
+               (strand 3 3)
                (skeleton_ns_0 1 1)
                (skeleton_ns_1 1 1)
                ]
-      ;#:expect unsat
+      #:expect unsat
       )
 
-(display ns_fixed_exploit_UNSAT)
+;(display ns_fixed_exploit_UNSAT)
 

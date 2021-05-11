@@ -46,11 +46,11 @@
 ;(relation-typelist skeleton_ns_0_n1)
 
 
-(set-option! 'verbose 5)
-(set-option! 'solver 'MiniSatProver)
-(set-option! 'logtranslation 2)
-(set-option! 'coregranularity 2)
-(set-option! 'core_minimization 'rce)
+;(set-option! 'verbose 5)
+;(set-option! 'solver 'MiniSatProver)
+;(set-option! 'logtranslation 2)
+;(set-option! 'coregranularity 2)
+;(set-option! 'core_minimization 'rce)
 
 (pred attack_exists
       (in (+ (join ns_init ns_init_n1)
@@ -60,8 +60,8 @@
 (pred success      
       (in (+ (join ns_init ns_init_n1)
              (join ns_init ns_init_n2))
-          (& (join ns_init learned_times Timeslot)
-             (join ns_resp learned_times Timeslot))))
+          (& (join (join ns_init agent) learned_times Timeslot)
+             (join (join ns_resp agent) learned_times Timeslot))))
 
 (pred attack_frame      
       (! (in (join ns_init ns_init_n1)             
@@ -70,8 +70,8 @@
              (join Attacker generated_times Timeslot)))
 
       ; Stopgap: initiator believes they are a, and responder believes they are b
-      (= (join ns_init ns_init_a) ns_init)            
-      (= (join ns_resp ns_resp_b) ns_resp)
+      (= (join ns_init ns_init_a) (join ns_init agent))
+      (= (join ns_resp ns_resp_b) (join ns_resp agent))
       
       ; Require the secrets to be different
       (! (= (join ns_init ns_init_n1)
@@ -100,12 +100,14 @@
                (Message 6 6) ; not "mesg"
                (text 2 2)
                (Ciphertext 5 5)
+               (AttackerStrand 1 1)
                (Attacker 1 1)
                (ns_init 1 1)
                (ns_resp 1 1)
                (PrivateKey 3 3)
                (PublicKey 3 3)
                (skey 0 3)
+               (strand 3 3)
                (skeleton_ns_0 1 1)
                (skeleton_ns_1 1 1)
                ]
