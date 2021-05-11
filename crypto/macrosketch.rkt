@@ -188,7 +188,7 @@
   ; (a1 a2)
   ; Name is from CPSA docs. Bind a strand's variable name to a term
   ;   constructed from variables of the skeleton.
-  (struct ast-maplet (var value))
+  (struct ast-maplet (var value) #:transparent)
   (define-syntax-class mapletClass
     #:description "maplet"
     (pattern (var:id value:termClass)
@@ -535,11 +535,13 @@
                   ; Note that datum-ast->expr needs to know the role whose viewpoint we're constraining
                   ;  For instance, if the datum is "a", but we're talking about a "resp" strand, then
                   ;  we need to use the field "resp_a" since that's what the macro expansion produces.                  
-                  (unless (ast-text? (ast-maplet-value mlt))
-                    (error (format "at the moment, right-hand-side terms in maplets must be (unwrapped) identifiers: ~a" (second mlt))))
+                  ;(unless (ast-text? (ast-maplet-value mlt))
+                  ;  (error (format "at the moment, right-hand-side terms in maplets must be (unwrapped) identifiers: ~a" (ast-maplet-value mlt))))
                   #`(= (join #,this-strand #,(id->strand-var pname strand-role (ast-maplet-var mlt)))  ; VARIABLE    
-                       (join #,skelesig #,(id->skeleton-var pname skeleton-idx (ast-text-value (ast-maplet-value mlt))))) ; VALUE                   
-                  ))])
+                       
+                             ;#,(id->skeleton-var pname skeleton-idx (ast-text-value (ast-maplet-value mlt)))
+                             #,(datum-ast->expr skelesig pname skeleton-idx (ast-maplet-value mlt) #:id-converter id->skeleton-var)) ; VALUE  
+                  ))]) 
     #`(some ([#,this-strand #,strand-role-sig]) 
             (&& #,@maplet-constraints))))
 
