@@ -24,7 +24,7 @@ d3.select(svg)
 
 // data from forge spec
 const timeslots = Timeslot.atoms(true);
-const agents = Agent.atoms(true);
+const agents = name.atoms(true);
 const messages = Message.atoms(true);
 
 // map from Timeslot -> Agent -> [Data]
@@ -181,7 +181,7 @@ function y(timeslot) {
  * @param {Object} m - a message prop from the forge spec
  */
  function messageX1(m) {
-    return x(m.sender);
+    return x(m.sender.agent);
 }
 
 /**
@@ -190,7 +190,7 @@ function y(timeslot) {
  * @param {Object} m - a message prop from the forge spec
  */
 function messageX2(m) {
-    return x(m.receiver);
+    return x(m.receiver.agent);
 }
 
 /**
@@ -316,75 +316,43 @@ function replaceDatum(d) {
     }
 }
 
-function filterComplexData(textArray) {
+function wrapText(container, text, width, x, y, color) {
 
-    const simple = [];
-    const complex = [];
+    const textElt = container.append('text')
+        .attr('x', x)
+        .attr('y', y)
+        .style('font-family', '"Open Sans", sans-serif')
+        .style('fill', color)
+        .text(text);
 
-    textArray.forEach((d) => {
+    const w = textElt.node().getComputedTextLength();
+    const r = width / w; // TODO: check integer / zero stuff
+    if (r < 1) {
+        const l = text.length;
+        const index = Math.round(r * l); // TODO: check
+        // TODO: break on nearest space?
+        const before = text.slice(0, index);
+        const after = text.slice(index);
+        textElt.node().remove();
 
-        let replaced = replaceDatum(d);
-
-        if ('subscript' in replaced) {
-            complex.push(replaced);
-        } else {
-            simple.push(replaced.content);
-        }
-
-    });
-
-    return {simple, complex};
-}
-
-function formatText(container, startX, startY, textArray, color) {
-
-    const filtered = filterComplexData(textArray);
-
-    // split the text so that there is no more than 3 items per line
-    const infoPerLine = 3;
-    const lineHeight = 20;
-    const numberOfLines = Math.ceil(filtered.simple.length / infoPerLine) + filtered.complex.length;
-
-    let line;
-    for (line = 0; line < numberOfLines; line++) {
-
-        let rangeStart = line * infoPerLine;
-        let rangeEnd = line * infoPerLine + infoPerLine;
-
-        const lineContents = filtered.simple.slice(rangeStart, rangeEnd);
-
-        // append the old information
-        const text = container.append('text')
-            .attr('x', startX)
-            .attr('y', () => startY + (lineHeight * line))
+        const temp = container.append('text')
+            .attr('x', x) 
+            .attr('y', y)
             .style('font-family', '"Open Sans", sans-serif')
             .style('fill', color)
-            .text(lineContents);
+            .text(before);
+
+        const h = 20; // TEMP: get text height
+
+        console.log("rest: " + after);
+
+        return h + wrapText(container, after, width, x, y + h, color);
+        
     }
 
-    let simpleLines = 0
-    if (filtered.simple.length > 0) {
-        simpleLines = line - 1;
-    }
+    return 20; // TEMP: get text height
 
-    // FOR each thing in complex, give it it's own line
-    for (line = 0; line < filtered.complex.length; line++) {
-        let currInfo = filtered.complex[line];
-        const text = container.append('text')
-            .attr('x', startX)
-            .attr('y', () => startY + (lineHeight * (simpleLines + line)))
-            .style('font-family', '"Open Sans", sans-serif')
-            .style('fill', color)
-            .text(currInfo.content);
-
-        text.append('tspan')
-            .text(currInfo.subscript)
-            .style('font-size', 12)
-            .attr('dx', 5)
-            .attr('dy', 5);
-    }
-
-    return numberOfLines * lineHeight;
+    
 }
 
 function render() {
@@ -554,25 +522,17 @@ function render() {
                     }
                 });
 
-                /*
-                console.log(`TO DISPLAY FOR ${a} at ${ts}:`);
-                console.log("NEW INFO");
-                console.log(newInfo);
-                console.log("GEN INFO");
-                console.log(generatedInfo);
-                console.log("OLD INFO");
-                console.log(oldInfo);*/
+                let h = 0;
 
-                g.append('text')
-                    .attr('x', boxX)
-                    .attr('y', boxY)
-                    .attr('class', 'wrap')
-                    .style('font-family', '"Open Sans", sans-serif')
-                    .style('fill', RED)
-                    .text(newInfo);
+                // TODO: see old filterComplexData method
+                const genInfoString = generatedInfo.join(" ");
+                h = wrapText(g, genInfoString, boxWidth - 25, boxX + 10, boxY + 20, GREEN);
 
-                const wrap = d3textwrap.textwrap().bounds({width: boxWidth, height: boxHeight});
-                d3.selectAll('.wrap').call(wrap);
+                const newInfoString = newInfo.join(" ");
+                h = wrapText(g, newInfoString, boxWidth - 25, boxX + 10, boxY + 20 + h, RED);
+
+                const oldInfoString = oldInfo.join(" ");
+                h = wrapText(g, oldInfoString, boxWidth - 25, boxX + 10, boxY + 40 + h, BLACK);
 
                 // TODO: calculate the resulting height and offset the next group of information
                 
