@@ -8,11 +8,15 @@
 
 abstract sig mesg {} -- CPSA name for any term
 
-sig Key extends mesg {}
-sig PrivateKey extends Key {}
-sig PublicKey extends Key {}
+abstract sig Key extends mesg {}
+abstract sig akey extends Key {}
 sig skey extends Key {}
+sig PrivateKey extends akey {}
+sig PublicKey extends akey {}
 
+-- Cannot just write fun akey: set Key { PublicKey + PrivateKey }
+--   since the macro expands variable declarations to field definitions,
+--   and those need to be in terms of sigs
 
 -- relation to match key pairs -- 
 

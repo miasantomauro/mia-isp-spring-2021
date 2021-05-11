@@ -95,7 +95,7 @@
                (strand 3 3)
                (skeleton_ns_0 1 1)
                (skeleton_ns_1 1 1)
-               ]
+               ] ; omitted akey - note in case of bounds issue
       #:expect sat)
 
 (test ns_fixed_exploit_UNSAT

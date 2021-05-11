@@ -58,7 +58,7 @@
              #:attr tostruct (ast-key #'x 'invk))
     ; This production exists to allow encrypting by key-valued variables. E.g., from Blanchet:    
     ;(send (enc (enc s (invk a)) b))
-    ; where (a b akey) is declared
+    ; where, e.g., (a b akey) is declared
     (pattern x:id
              #:attr tostruct (ast-key #'x 'vark)))
             
@@ -232,14 +232,18 @@
                                                 (ast-role-declarations rolestruct)
                                                 (ast-role-vars rolestruct))))))]))
 
-; TODO: placeholder
-(fun (getInv k)
-      k)
+(define-for-syntax (cleanup-type t)
+  ; CPSA has two separate raw data sorts: "data" and "text"
+  ; For now, we combine both
+  (if (equal? (syntax->datum t) 'data)
+      (syntax/loc t text)
+      t))
+
 
 (define-for-syntax (build-variable-fields vardecls name1 name2 parent #:prefix [prefix ""])  
   (for/list ([decl (ast-vars-assoc-decls vardecls)])
     (with-syntax ([varid (first decl)]
-                  [type (second decl)])
+                  [type (cleanup-type (second decl))])
       #`(relation
          #,(format-id name1 "~a~a_~a_~a" prefix name1 name2 #'varid)
          (#,parent type)))))
