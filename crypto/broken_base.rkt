@@ -27,7 +27,9 @@ fun getLTK[name_a: name, name_b: name]: one skey {
 }
 
 fun getInv[k: (PrivateKey + PublicKey)]: one Key {
-k in PublicKey => ((KeyPairs.pairs).k) else (k.(KeyPairs.pairs))
+  (k in PublicKey => ((KeyPairs.pairs).k) else (k.(KeyPairs.pairs)))
+  +
+  (k in skey => k else none)
 }
 
 
@@ -86,25 +88,36 @@ pred wellformed {
     -- they have not already learned the mesg -- 
     {d not in (a.learned_times).(Timeslot - t.*next)} and 
 
-    -- They received the message
+    -- They received a message directly containing d (may be a ciphertext)
     {{some m: Message | {d in m.data and t = m.sendTime and m.receiver.agent = a}}
     or 
-    -- d can be the plaintext of a currently-known ciphertext
-    --   encrypted using a currently-known key (regardless of the timeslot's message)
-    {some c: Ciphertext | 
-        c in (a.learned_times).(Timeslot - t.^next) and 
+
+    -- deconstruct encrypted term 
+    -- constrain time to reception to avoid cyclic justification of knowledge. e.g.,
+    --    "I know enc(other-agent's-private-key, pubk(me)) [from below via construct]"
+    --    "I know other-agent's-private-key [from above via deconstruct]""
+    -- instead: separate the two temporally: deconstruct on recv, construct on non-reception?
+    -- in that case, the cycle can't exist in the same timeslot
+    -- might think to write an accessibleSubterms function as below, except:
+    -- consider: (k1, enc(k2, enc(n1, invk(k2)), invk(k1)))
+    -- or, worse: (k1, enc(x, invk(k3)), enc(k2, enc(k3, invk(k2)), invk(k1)))
+    { {some m: Message | m.receiver.agent = a and m.sendTime = t}
+      {some c: Ciphertext | 
         d in c.plaintext and 
-        c.encryptionKey in skey and
-        -- Either pub/priv keypair OR a LTK (symmetric)
-        (KeyPairs.pairs.(c.encryptionKey) + c.encryptionKey)
-        in (a.learned_times).(Timeslot - t.^next)}
-    or
-    {some c: Ciphertext | 					
-        c in (a.learned_times).(Timeslot - t.^next) and 
-        d in c.plaintext and 
-        c.encryptionKey in (PublicKey + PrivateKey) and 
-        getInv[c.encryptionKey] in (a.learned_times).(Timeslot - t.^next)}
+        c in (a.learned_times).(Timeslot - t.^next) and
+        getInv[c.encryptionKey] in (a.learned_times).(Timeslot - t.^next)
+      }
+    }
     or 
+    -- construct encrypted terms (only allow at NON-reception time; see above)
+    -- NOTE WELL: if ever allow an agent to send/receive at same time, need rewrite 
+    {d in Ciphertext and 
+	   d.encryptionKey in (a.learned_times).(Timeslot - t.^next) and        
+	   d.plaintext in (a.learned_times).(Timeslot - t.^next)
+     {no m: Message | m.receiver.agent = a and m.sendTime = t} -- non-reception
+     }
+    or 
+
     -- name knows all public keys
     {d in PublicKey}
     or
@@ -113,13 +126,6 @@ pred wellformed {
     -- name knows long-term keys they are party to
     or
     {some a2 : name - a | d in getLTK[a, a2] + getLTK[a2, a] }
-    or
-    -- name can *encrypt* things they know with a key they know
-    {d in Ciphertext and 
-	d.encryptionKey in (a.learned_times).(Timeslot - t.^next) and
-        -- removed to allow nested encryption
-	--{all a: d.plaintext | a not in Ciphertext} and 
-	d.plaintext in (a.learned_times).(Timeslot - t.^next)}
     or 
     -- names know their own names
     {d = a}
@@ -159,6 +165,18 @@ fun subterm[supers: set mesg]: set mesg {
   supers +
   supers.^(plaintext) -- union on new subterm relations inside parens
 }
+-- Problem: (k1, enc(k2, enc(n1, invk(k2)), invk(k1)))
+--  Problem: (k1, enc(x, invk(k3)), enc(k2, enc(k3, invk(k2)), invk(k1)))
+--    needs knowledge to grow on the way through the tree, possibly sideways
+-- so this approach won't work
+/*fun accessibleSubterms[supers: set mesg, known: set mesg]: set mesg {
+  -- VITAL: ditto above 
+  -- plaintext: Ciphertext -> set mesg
+  -- set of Ciphertexts this agent can now open: 
+  let openable = {c: Ciphertext | getInv[c.encryptionKey] in known} |
+    supers + 
+    supers.^(plaintext & (openable -> mesg))
+}*/
 
 -- Differs slightly in that a is a strand, not a node
 pred originates[a: name, d: mesg] {
@@ -241,7 +259,7 @@ pred ns_execution {
       -- recall "owners" takes us to private key, and then lookup in pairs
       m0.data.encryptionKey = KeyPairs.pairs[KeyPairs.owners.(init.init_b)]
       m0.sender = init
-      init.init_b not in init
+      --init.init_b not in init
       --init.init_a = init
   --         (recv (enc n1 n2 (pubk a)))
       m1.data.plaintext = init.init_n1 + init.init_n2    
