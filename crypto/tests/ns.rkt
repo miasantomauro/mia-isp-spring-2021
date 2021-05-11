@@ -55,8 +55,15 @@
 (pred attack_exists
       (in (+ (join ns_init ns_init_n1)
              (join ns_init ns_init_n2))
-          (join Attacker learned_times Timeslot))
-      
+          (join Attacker learned_times Timeslot)))
+
+(pred success      
+      (in (+ (join ns_init ns_init_n1)
+             (join ns_init ns_init_n2))
+          (& (join ns_init learned_times Timeslot)
+             (join ns_resp learned_times Timeslot))))
+
+(pred attack_frame      
       (! (in (join ns_init ns_init_n1)             
              (join Attacker generated_times Timeslot)))
       (! (in (join ns_init ns_init_n2)             
@@ -78,7 +85,11 @@
                constrain_skeleton_ns_1
                temporary
                wellformed
+               
+              ; (! attack_exists)
                attack_exists
+               success
+               attack_frame
                ]
       #:bounds [(is next linear)]
       #:scope [(mesg 16)
@@ -94,7 +105,7 @@
                (ns_resp 1 1)
                (PrivateKey 3 3)
                (PublicKey 3 3)
-               (skey 0 0)
+               (skey 0 3)
                (skeleton_ns_0 1 1)
                (skeleton_ns_1 1 1)
                ]

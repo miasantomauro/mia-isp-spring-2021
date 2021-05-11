@@ -6,6 +6,9 @@
 
 ; DESIGN CHOICES:
 ;   - non-orig and uniq-orig enforce both non/unique origination and non/unique generation.
+;   - no ordering on message contents (could do with sequencing/adding column)
+;   - strands can match within encrypted terms they cannot decrypt (unrealistic, should fix)
+
 
 ;https://hackage.haskell.org/package/cpsa-3.3.2/src/doc/cpsamanual.pdf
 ; At the moment, we have prototype support for the "basic" algebra
@@ -16,9 +19,6 @@
                               or/c define/contract listof [-> -->]) 
                      racket/match
                      racket/syntax))
-
-
-; TODO: break 1-1 between name and Strand
 
 (require "base.rkt") ; the base crypto model
 (provide (all-from-out "base.rkt")) ; let caller refer to base preds
@@ -41,19 +41,26 @@
   
   (struct ast-text (value) #:transparent)
   (define-syntax-class textClass
-    #:description "ground text value or variable (may be of sort text, name, or data)"
+    #:description "ground text value or variable (may be of any context-dependent sort)"
     (pattern x:id
              #:attr tostruct (ast-text #'x)))
 
   (struct ast-key (value wrap) #:transparent)
   (define-syntax-class keyClass
-    #:description "public, private, or symmetric long-term key"
+    #:description "public, private, long-term key, or an inverse key"
     (pattern ((~literal privk) x:id)
              #:attr tostruct (ast-key #'x 'privk))
     (pattern ((~literal pubk) x:id)
              #:attr tostruct (ast-key #'x 'pubk))
     (pattern ((~literal ltk) x:id y:id)
-             #:attr tostruct (ast-key #'(x y) 'ltk)))
+             #:attr tostruct (ast-key #'(x y) 'ltk))
+    (pattern ((~literal invk) x:id)
+             #:attr tostruct (ast-key #'x 'invk))
+    ; This production exists to allow encrypting by key-valued variables. E.g., from Blanchet:    
+    ;(send (enc (enc s (invk a)) b))
+    ; where (a b akey) is declared
+    (pattern x:id
+             #:attr tostruct (ast-key #'x 'vark)))
             
   (struct ast-enc (values key) #:transparent)
   (define-syntax-class encClass
@@ -149,6 +156,12 @@
              #:attr tostruct (ast-event #'this-syntax 'recv (de-cat (attribute vals.tostruct)))))
  
 
+  (struct ast-listener (values) #:transparent)
+  (define-syntax-class listenerClass
+    #:description "listener strand declaration"
+    (pattern ((~literal deflistener) x:id ...)
+             #:attr tostruct (ast-listener (syntax->list #'(x ...)))))
+  
   ;  (non-orig (privk a) (privk b))
   (struct ast-non-orig (data) #:transparent)
   (define-syntax-class nonOrigClass
@@ -219,6 +232,10 @@
                                                 (ast-role-declarations rolestruct)
                                                 (ast-role-vars rolestruct))))))]))
 
+; TODO: placeholder
+(fun (getInv k)
+      k)
+
 (define-for-syntax (build-variable-fields vardecls name1 name2 parent #:prefix [prefix ""])  
   (for/list ([decl (ast-vars-assoc-decls vardecls)])
     (with-syntax ([varid (first decl)]
@@ -264,7 +281,6 @@
          ))
 
 ; Assume that values are just strand-local.
-; TODO: prevent match if unable to read within a term, unless mesg type
 (define-for-syntax (build-subterm-list-constraints pname rname parentname fieldname this-strand subterms)
   (let* ([term-exprs-and-constraints
           (for/list ([a-term subterms])                                        
@@ -321,21 +337,25 @@
         #`(join KeyPairs owners (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx owner-or-pair)))]
        ['pubk
         #`(join (join KeyPairs owners (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx owner-or-pair))) (join KeyPairs pairs))]
+       ['invk
+        ; Inverse of a given value (Forge's not-quite-type-system will warn if bad arg because empty join)
+        #`(getInv (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx owner-or-pair)))]
        ['ltk
         (let ([pr (syntax->list owner-or-pair)])
           #`(getLTK 
              (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx (first pr)))
-             (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx (second pr)))))])]
+             (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx (second pr)))))]
+       ['vark
+        ; Variable reference; just resolve it. As in invk case, trust Forge's validation to catch issues
+        ; TODO: ideally, we would do a separate validation pass and give a clean error message
+        #`(join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx owner-or-pair))])]
     [(ast-enc subterms k)
      ; Manufacture a fresh variable id
-     (let ([fresh (gensym)])
-       ;(printf "Generating ID ~a for ~a~n" fresh (equal-hash-code t))
+     (let ([fresh (gensym)])       
        #`#,(format-id pname "enc~a" fresh))
      ]
     [(ast-cat subterms)
      (error (format "unexpected cat in datum-sat->expr: ~a" t))]))
-
-; (recv (enc n1 a (pubk b)))
   
 (define-for-syntax (build-role-predicate-body pname rname rolesig a-trace role-decls vars)  
   ; E.g., ((msg0 . (rel Message)) (msg1 . (- (rel Message) msg0)) (msg2 . (- (- (rel Message) msg1) msg0)))
@@ -351,7 +371,7 @@
       #`(all ([rv #,rolesig])
              (&&
               ; sometimes non-orig etc. appear in role definition
-              #,@(build-role-orig-constraints #'rv pname rname rolesig role-decls)
+              #,@(build-role-orig-constraints #'rv pname rname rolesig role-decls vars)
               ; enforce that every variable is populated uniquely
               #,@(for/list ([vt (ast-vars-assoc-decls vars)])
                    (let ([v (first vt)])                     
@@ -371,20 +391,20 @@
   (define-values (n ifc afc ap mp ikl st s2) (struct-type-info t))
   n)
 
-(define-for-syntax (build-role-orig-constraints rv pname rname rolesig role-decls)  
+(define-for-syntax (build-role-orig-constraints rv pname rname rolesig role-decls vars)  
   (flatten
    (for/list ([d role-decls])
      (cond [(equal? (struct->name d) 'ast-uniq-orig)
-            (build-orig-constraints rv rname #'one ast-uniq-orig-data pname (list d) #:id-converter id->strand-var)]
+            (build-orig-constraints rv rname #'one ast-uniq-orig-data pname (list d) vars #:id-converter id->strand-var)]
            [(equal? (struct->name d) 'ast-non-orig)
-            (build-orig-constraints rv rname #'no ast-non-orig-data pname (list d) #:id-converter id->strand-var)]
+            (build-orig-constraints rv rname #'no ast-non-orig-data pname (list d) vars #:id-converter id->strand-var)]
            [else
             (error (format "unknown decl type: ~a in ~a" (struct->name d) d))]))))
 
 
 ; Main macro for defprotocol declarations
 (define-syntax (defprotocol stx)
-  (syntax-parse stx [(defprotocol pname:id ptype:id roles:defroleClass ...)
+  (syntax-parse stx [(defprotocol pname:id ptype:id roles:defroleClass ... (~optional comment:commentClass))
                      ;(quasisyntax/loc stx #,(attribute roles.tostruct))
                      (quasisyntax/loc stx
                        (begin (roleforge pname roles) ...))
@@ -409,7 +429,8 @@
 ; Define a skeleton subsig for each skeleton.
 (define-syntax (defskeleton stx)
   (syntax-parse stx [(defskeleton pname:id vars:varsClass strands:strandClass ...
-                       non-orig:nonOrigClass uniq-orig:uniqOrigClass (~optional comment:commentClass))
+                       (~optional listeners:listenerClass)
+                       (~optional non-orig:nonOrigClass) (~optional uniq-orig:uniqOrigClass) (~optional comment:commentClass))
                      (let ([idx (unbox-and-increment skeleton-index)])
                        (with-syntax ([skelesig (format-id #'pname "skeleton_~a_~a" #'pname idx)])                         
                        (quasisyntax/loc stx
@@ -435,33 +456,61 @@
                                           idx
                                           this-strand-ast
                                           strand-idx)))
+                                  
+                                  ; Listener (if any)
+                                  #,@(build-listener #'skelesig #'pname idx (attribute listeners.tostruct))
+                                  
                                   ; enforce that every variable is populated uniquely
                                   #,@(for/list ([vt (ast-vars-assoc-decls (attribute vars.tostruct))])
                                        (let ([v (first vt)])                     
                                          #`(one (join skelesig #,(id->skeleton-var #'pname idx v))))) 
                                   ; declarations
                                   ; wrap in list for extensibility when we support >1 decl of each type
-                                  #,@(build-orig-constraints #'skelesig idx #'no ast-non-orig-data #'pname (list (attribute non-orig.tostruct)))
-                                  #,@(build-orig-constraints #'skelesig idx #'one ast-uniq-orig-data #'pname (list (attribute uniq-orig.tostruct)))
+                                  #,@(build-orig-constraints #'skelesig idx #'no ast-non-orig-data #'pname
+                                                             (list (attribute non-orig.tostruct))
+                                                             (attribute vars.tostruct))
+                                  #,@(build-orig-constraints #'skelesig idx #'one ast-uniq-orig-data #'pname (list (attribute uniq-orig.tostruct))
+                                                             (attribute vars.tostruct))
                                   ))))))]))
+
+; Should work for either skeleton or protocol source
+(define-for-syntax (build-listener this-strand-or-skeleton pname strand-role-or-skeleton-idx ast #:id-converter [id-converter id->skeleton-var])
+  (if ast
+      (for/list ([v (ast-listener-values ast)])
+        #`(in (join #,this-strand-or-skeleton #,(id-converter pname strand-role-or-skeleton-idx v))
+              (join Attacker learned_times Timeslot)))
+      '()))
+
+; The AST naming convention conflates "text" (the sort) with identifiers. 
+(define-for-syntax (is-text-variable? v vars)
+  (if (ast-text? v)
+      (let* ([vdecls (map (lambda (p) (list (syntax->datum (first p))
+                                            (syntax->datum (second p))))
+                          (ast-vars-assoc-decls vars))]
+             [vsym (syntax->datum (ast-text-value v))]
+             [vdecl (assoc vsym vdecls)])         
+        (unless vdecl
+          (error (format "is-text-variable? couldn't find variable ~a in ~a" vsym vdecls)))
+        (equal? (second vdecl) 'text))
+      #f))
 
 
 ; we don't need to resolve each strand's idea of who "a" is.
 ; we just need the value corresponding to the SKELETON's "a" (or the local strand's "a", if this came from a role defn), which we have already
 (define-for-syntax (build-orig-constraints this-strand-or-skeleton
                                            strand-role-or-skeleton-idx
-                                           kind accessor pname asts #:id-converter [id-converter id->skeleton-var])
+                                           kind accessor pname asts vars #:id-converter [id-converter id->skeleton-var])  
   (let ([result
          (flatten
           (for/list ([ast asts])
-            (for/list ([term (accessor ast)])              
+            (for/list ([term (if ast (accessor ast) '())]) ; if no such decls are present, do nothing
               #`(#,kind ([aStrand name])
                         (||
                          (originates aStrand
                                      #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter))
                          ; conflate origination and generation, but only when it's well-typed to do so
-                         ; (generation in our model is for text only, not keys -- TODO check soundness)
-                         #,(if (ast-text? term)
+                         ; (generation in our model is for text only, not keys)
+                         #,(if (is-text-variable? term vars)
                                #`(generates aStrand
                                     #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter))
                                #'false))))))])
@@ -481,7 +530,7 @@
           #`(#,@(for/list ([mlt (ast-strand-maplets strand-ast)])
                   ; Note that datum-ast->expr needs to know the role whose viewpoint we're constraining
                   ;  For instance, if the datum is "a", but we're talking about a "resp" strand, then
-                  ;  we need to use the field "resp_a" since that's what the macro expansion produces.
+                  ;  we need to use the field "resp_a" since that's what the macro expansion produces.                  
                   (unless (ast-text? (ast-maplet-value mlt))
                     (error (format "at the moment, right-hand-side terms in maplets must be (unwrapped) identifiers: ~a" (second mlt))))
                   #`(= (join #,this-strand #,(id->strand-var pname strand-role (ast-maplet-var mlt)))  ; VARIABLE    
