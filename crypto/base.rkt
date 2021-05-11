@@ -182,17 +182,17 @@ fun subterm[supers: set mesg]: set mesg {
     supers.^(plaintext & (openable -> mesg))
 }*/
 
--- Differs slightly in that a is a strand, not a node
-pred originates[a: name, d: mesg] {
+-- Note it's vital this definition is about strands, not names
+pred originates[s: strand, d: mesg] {
 
   -- unsigned term t originates on n in N iff
   --   term(n) is positive and
   --   t subterm of term(n) and
   --   whenever n' precedes n on the same strand, t is not subterm of n'
 
-  some m: sender.agent.a | { -- messages sent by a (positive term)     
+  some m: sender.s | { -- messages sent by strand a (positive term)     
       d in subterm[m.data] -- d is a sub-term of m     
-      all m2: (sender.agent.a + receiver.agent.a) - m | { -- everything else on the strand
+      all m2: (sender.s + receiver.s) - m | { -- everything else on the strand
           -- ASSUME: messages are sent/received in same timeslot
           {m2.sendTime in m.sendTime.^(~(next))}
           implies          
@@ -201,8 +201,8 @@ pred originates[a: name, d: mesg] {
   }
 }
 
-pred generates[a: name, d: mesg] {
-  some (a.generated_times)[d]
+pred generates[s: strand, d: mesg] {
+  some ((s.agent).generated_times)[d]
 }
 
 pred temporary {
