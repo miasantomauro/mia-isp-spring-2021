@@ -181,7 +181,7 @@ function y(timeslot) {
  * @param {Object} m - a message prop from the forge spec
  */
  function messageX1(m) {
-    return x(m.sender);
+    return x(m.sender.agent);
 }
 
 /**
@@ -190,7 +190,7 @@ function y(timeslot) {
  * @param {Object} m - a message prop from the forge spec
  */
 function messageX2(m) {
-    return x(m.receiver);
+    return x(m.receiver.agent);
 }
 
 /**
