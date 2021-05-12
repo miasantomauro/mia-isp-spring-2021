@@ -1,12 +1,12 @@
 // TODOs
-// - better text formatting (https://github.com/d3plus/d3plus/wiki/Text-Wrapping)
+// - better text formatting (https://www.npmjs.com/package/d3-textwrap)
 // - dropped / tampered messages (?)
 
 // constants for our visualization
 const baseX = 150;
 const baseY = 100;
 const timeslotHeight = 80;
-const nameWidth = 300;
+const agentWidth = 300;
 let boxHeight = 130;
 const boxWidth = 200;
 const RED = '#E54B4B';
@@ -24,32 +24,32 @@ d3.select(svg)
 
 // data from forge spec
 const timeslots = Timeslot.atoms(true);
-const names = name.atoms(true);
+const agents = name.atoms(true);
 const messages = Message.atoms(true);
 
-// map from Timeslot -> name -> [Data]
+// map from Timeslot -> Agent -> [Data]
 const learnedInformation = {};
-// map from Timeslot -> name -> [Data]
+// map from Timeslot -> Agent -> [Data]
 const generatedInformation = {};
-// map from Timeslot -> name -> Boolean
+// map from Timeslot -> Agent -> Boolean
 const visibleInformation = {};
 // map from Datum -> Message
 const dataMessageMap = {};
-// map from public key (Datum) -> owner (name)
+// map from public key (Datum) -> owner (Agent)
 const pubKeyMap = {};
-// map from private key (Datum) -> owner (name)
+// map from private key (Datum) -> owner (Agent)
 const privKeyMap = {};
 
-const nameNames = names.map(x => x.toString());
+const agentNames = agents.map(x => x.toString());
 const keyNames = Key.atoms(true).map(x => x.toString());
 
 // populating the learnedInformation object
-names.forEach((name) => {
+agents.forEach((agent) => {
 
-    let a = name.toString();
+    let a = agent.toString();
 
     // grab the learned_times data from the forge spec
-    const learned = name.learned_times.tuples().map(tuple => tuple.atoms());
+    const learned = agent.learned_times.tuples().map(tuple => tuple.atoms());
 
     learned.map((info) => {
         // unpack the information
@@ -64,14 +64,14 @@ names.forEach((name) => {
             learnedInformation[ts][a] = [];
         }
 
-        if (ts !== "Timeslot0" || (!nameNames.includes(d) && !keyNames.includes(d))) {
+        if (ts !== "Timeslot0" || (!agentNames.includes(d) && !keyNames.includes(d))) {
             // store the information in our learnedInformation object
             learnedInformation[ts][a].push(d);
         }
     });
 
     // grab the generated_times data from the forge spec
-    const generated = name.generated_times.tuples().map(tuple => tuple.atoms());
+    const generated = agent.generated_times.tuples().map(tuple => tuple.atoms());
 
     generated.map((info) => {
         // unpack the information
@@ -95,8 +95,8 @@ names.forEach((name) => {
 // populating the visibleInformation object (initializing everything with false)
 timeslots.forEach((timeslot) => {
     const ts = timeslot.toString();
-    names.forEach((name) => {
-        const a = name.toString();
+    agents.forEach((agent) => {
+        const a = agent.toString();
 
         if (!visibleInformation[ts]) {
             visibleInformation[ts] = {};
@@ -141,11 +141,11 @@ function getTimeSlotsBefore(timeslot) {
 }
 
 /**
- * a function to get the x coordinate of a given name
- * @param {Object} name - an name prop from the forge spec
+ * a function to get the x coordinate of a given agent
+ * @param {Object} agent - an agent prop from the forge spec
  */
-function x(name) {
-    return baseX + (names.indexOf(name) * nameWidth);
+function x(agent) {
+    return baseX + (agents.indexOf(agent) * agentWidth);
 }
 
 /**
@@ -158,11 +158,11 @@ function y(timeslot) {
     const previousTimeslots = getTimeSlotsBefore(timeslot);
 
     previousTimeslots.forEach((ts) => {
-        // if there is an name with info visible in this timeslot, count it
+        // if there is an agent with info visible in this timeslot, count it
         let i;
         let v = false;
-        for (i = 0; i < names.length; i++) {
-            let a = names[i].toString();
+        for (i = 0; i < agents.length; i++) {
+            let a = agents[i].toString();
             if (visibleInformation[ts][a]) {
                 v = true;
             }
@@ -283,8 +283,8 @@ function centerText() {
 function onMouseClick(mouseevent, timeslot) {
     const ts = timeslot.toString();
 
-    names.forEach((name) => {
-        const a = name.toString();
+    agents.forEach((agent) => {
+        const a = agent.toString();
         visible = visibleInformation[ts][a];
         visibleInformation[ts][a] = !visible;
     });
@@ -336,55 +336,107 @@ function filterComplexData(textArray) {
     return {simple, complex};
 }
 
-function formatText(container, startX, startY, textArray, color) {
+//// helper function to find the last space before the given index in the given string
+function spaceBefore(string, index) {
 
-    const filtered = filterComplexData(textArray);
-
-    // split the text so that there is no more than 3 items per line
-    const infoPerLine = 3;
-    const lineHeight = 20;
-    const numberOfLines = Math.ceil(filtered.simple.length / infoPerLine) + filtered.complex.length;
-
-    let line;
-    for (line = 0; line < numberOfLines; line++) {
-
-        let rangeStart = line * infoPerLine;
-        let rangeEnd = line * infoPerLine + infoPerLine;
-
-        const lineContents = filtered.simple.slice(rangeStart, rangeEnd);
-
-        // append the old information
-        const text = container.append('text')
-            .attr('x', startX)
-            .attr('y', () => startY + (lineHeight * line))
-            .style('font-family', '"Open Sans", sans-serif')
-            .style('fill', color)
-            .text(lineContents);
+    let workingString = string;
+    let spaceIndex = -1;
+    let done = false;
+    
+    while(!done) {
+        let i = workingString.indexOf(" ");
+        if (i !== 0 && i <= index) {
+            spaceIndex = i;
+            // replace the first space with an X
+            workingString = workingString.slice(0, i) + "X" + workingString.slice(i + 1);
+        } else {
+            done = true;
+        }
     }
 
-    let simpleLines = 0
-    if (filtered.simple.length > 0) {
-        simpleLines = line - 1;
+    return spaceIndex;
+}
+
+function wrapText(container, text, width, x, y, color) {
+
+    if (text === "") {
+        return 0;
     }
 
-    // FOR each thing in complex, give it it's own line
-    for (line = 0; line < filtered.complex.length; line++) {
-        let currInfo = filtered.complex[line];
-        const text = container.append('text')
-            .attr('x', startX)
-            .attr('y', () => startY + (lineHeight * (simpleLines + line)))
+    const textElt = container.append('text')
+        .attr('x', x)
+        .attr('y', y)
+        .style('font-family', '"Open Sans", sans-serif')
+        .style('fill', color)
+        .text(text);
+
+    const w = textElt.node().getComputedTextLength();
+    const r = width / w; // w shouldn't be zero
+    if (r < 1) {
+
+        const l = text.length;
+        let index = Math.round(r * l); // TODO: check
+        const spaceIndex = spaceBefore(text, index);
+
+        
+        index = (spaceIndex === -1) ? index : spaceIndex;
+        // TODO: break on nearest space?
+        const before = text.slice(0, index);
+        const after = text.slice(index);
+
+        textElt.node().remove();
+
+        const temp = container.append('text')
+            .attr('x', x) 
+            .attr('y', y)
             .style('font-family', '"Open Sans", sans-serif')
             .style('fill', color)
-            .text(currInfo.content);
+            .text(before);
 
-        text.append('tspan')
-            .text(currInfo.subscript)
+        const h = 20; // TEMP: get text height
+
+        return h + wrapText(container, after, width, x, y + h, color);
+        
+    }
+
+    return 20; // TEMP: get text height
+
+    
+}
+
+function displayInfo(container, info, x, y, color) {
+
+    let h = 0;
+
+    const {simple, complex} = filterComplexData(info);
+    const s = simple.join(" ");
+
+    h += wrapText(container, s, boxWidth - 25, x, y, color);
+
+    let i;
+    for (i = 0; i < complex.length; i++) {
+
+        let t = complex[i].content;
+
+        let subscript = complex[i].subscript;
+
+        const temp = container.append('text')
+            .attr('x', x)
+            .attr('y', y + h)
+            .style('font-family', '"Open Sans", sans-serif')
+            .style('fill', color)
+            .text(t);
+
+        temp.append('tspan')
+            .text(subscript)
             .style('font-size', 12)
             .attr('dx', 5)
             .attr('dy', 5);
+
+        h+=20;
     }
 
-    return numberOfLines * lineHeight;
+    return h;
 }
 
 function render() {
@@ -398,7 +450,7 @@ function render() {
         .join('line')
         .attr('x1', baseX)
         .attr('y1', y)
-        .attr('x2', baseX + ((names.length - 1) * nameWidth))
+        .attr('x2', baseX + ((agents.length - 1) * agentWidth))
         .attr('y2', y)
         .attr('stroke', BLACK)
         .attr('fill', 'white')
@@ -416,10 +468,10 @@ function render() {
         .style('cursor', 'pointer')
         .text((t) => t._id);
 
-    // draw the names
+    // draw the agents
     const a = d3.select(svg)
-        .selectAll('name')
-        .data(names)
+        .selectAll('agent')
+        .data(agents)
         .join('line')
         .attr('stroke', BLUE)
         .style('stroke-width', 10)
@@ -428,10 +480,10 @@ function render() {
         .attr('x2', x)
         .attr('y2', y(timeslots[timeslots.length - 1]));
 
-    // label the names
+    // label the agents
     const aLabel = d3.select(svg)
-        .selectAll('nameLabel')
-        .data(names)
+        .selectAll('agentLabel')
+        .data(agents)
         .join('text')
         .attr('x', x)
         .attr('y', baseY - 40)
@@ -500,20 +552,20 @@ function render() {
 
     timeslots.forEach((timeslot) => {
         let ts = timeslot.toString();
-        names.forEach((name) => {
-            let a = name.toString();
+        agents.forEach((agent) => {
+            let a = agent.toString();
             if (visibleInformation[ts][a]) {
 
-                const boxX = x(name) - (boxWidth / 2.0);
+                const boxX = x(agent) - (boxWidth / 2.0);
                 const boxY = y(timeslot) + 30;
 
-                // create a group and give it an id specific to this timeslot-name pair
+                // create a group and give it an id specific to this timeslot-agent pair
                 const g = d3.select(svg)
                     .append('g')
                     .attr('id', ts + a);
             
                 // append the rect
-                g.append('rect')
+                const r = g.append('rect')
                     .attr('x', boxX)
                     .attr('y', boxY)
                     .attr('width', boxWidth)
@@ -525,49 +577,45 @@ function render() {
                     .attr('stroke', BLUE)
                     .attr('stroke-width', '3');
 
-                let textHeight = 20;
-
+                // collect the new information
                 let newInfo = [];
                 if (learnedInformation[ts] && learnedInformation[ts][a]) {
                     newInfo = learnedInformation[ts][a];
                 }
 
-                // fetch any generated information and remove it from newInfo
+                // collect the generated information
+                let generatedInfo = [];
                 if (generatedInformation[ts] && generatedInformation[ts][a]) {
-                    const generatedInfo = generatedInformation[ts][a];
+                    generatedInfo = generatedInformation[ts][a];
+                    // remove any generated info from newInfo
                     generatedInfo.forEach((x) => {
-
                         const index = newInfo.indexOf(x);
                         if (index > -1) {
                             newInfo.splice(index, 1);
                         }
                     });
+                }
 
-                    // display the generated info in green
-                    textHeight += formatText(g, boxX + 5, boxY + textHeight, generatedInfo, GREEN);
-                    textHeight += 20;
-                }
-                
-                if (newInfo) {
-                    // display the new info in red
-                    textHeight += formatText(g, boxX + 5,  boxY + textHeight, newInfo, RED);
-                    textHeight += 20;
-                }
-    
                 // collect the old information
+                let oldInfo = [];
                 const sliceIndex = timeslots.indexOf(timeslot);
                 const previousTimeslots = timeslots.slice(0, sliceIndex).map(t => t.toString());
-                let oldInfo = [];
                 previousTimeslots.forEach((old_ts) => {
-                    oldInfo = oldInfo.concat(learnedInformation[old_ts][a]);
+                    if (learnedInformation[old_ts] && learnedInformation[old_ts][a]) {
+                        oldInfo = oldInfo.concat(learnedInformation[old_ts][a]);
+                    }
                 });
 
-                // display the old info over multiple lines
-                textHeight += formatText(g, boxX + 5, boxY + textHeight, oldInfo, BLACK);
-                textHeight += 20;
+                let h = 0;
 
-                // TODO: set boxHeight to be the max of itself and textHeight + 20 or something ?
-    
+                h += displayInfo(g, generatedInfo, boxX + 10, boxY + 20, GREEN);
+
+                h += displayInfo(g, newInfo, boxX + 10, boxY + 20 + h, RED);
+
+                h += displayInfo(g, oldInfo, boxX + 10, boxY + 20 + h, BLACK);
+
+                // TODO: calculate the resulting height and offset the next group of information
+                
             } else {
                 // remove the group if this timeslot is not supposed to be visible
                 d3.select('#' + ts + a).remove(); 
@@ -578,3 +626,4 @@ function render() {
 }
 
 render();
+
