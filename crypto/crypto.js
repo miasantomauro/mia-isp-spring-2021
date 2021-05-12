@@ -27,6 +27,15 @@ const timeslots = Timeslot.atoms(true);
 const agents = name.atoms(true);
 const messages = Message.atoms(true);
 
+const roles = {}
+agent.tuples().forEach(x => {
+    let role = x.atoms()[0].toString();
+    let name = x.atoms()[1].toString()
+    roles[name] = role;
+});
+
+console.log(roles);
+
 // map from Timeslot -> Agent -> [Data]
 const learnedInformation = {};
 // map from Timeslot -> Agent -> [Data]
@@ -480,7 +489,7 @@ function render() {
         .attr('x2', x)
         .attr('y2', y(timeslots[timeslots.length - 1]));
 
-    // label the agents
+    // label the strands with their names
     const aLabel = d3.select(svg)
         .selectAll('agentLabel')
         .data(agents)
@@ -488,7 +497,17 @@ function render() {
         .attr('x', x)
         .attr('y', baseY - 40)
         .style('font-family', '"Open Sans", sans-serif')
-        .text((a) => a._id);
+        .text((a) => `${a.toString()} (${roles[a.toString()]})`);
+
+    // label the strands with their roles
+    const aLabel2 = d3.select(svg)
+        .selectAll('agentLabel')
+        .data(agents)
+        .join('text')
+        .attr('x', x)
+        .attr('y', baseY - 60)
+        .style('font-family', '"Open Sans", sans-serif')
+        .text((a) => roles[a.toString()]);
 
     // bind messages to m
     const m = d3.select(svg)
