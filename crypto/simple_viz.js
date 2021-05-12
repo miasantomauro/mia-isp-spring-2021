@@ -6,7 +6,7 @@ const boxHeight = 130;
 const boxWidth = 200;
 
 const timeslots = Timeslot.atoms(true);
-const names = Agent.atoms(true);
+const names = name.atoms(true);
 const messages = Message.atoms(true);
 
 const dataMessageMap = {};
@@ -41,8 +41,8 @@ function getTimeSlotsBefore(timeslot) {
 
 const x = name => baseX + (names.indexOf(name) * nameWidth);
 const y = timeslot => baseY + (timeslots.indexOf(timeslot) * timeslotHeight);
-const messageX1 = m => x(m.sender);
-const messageX2 = m => x(m.receiver);
+const messageX1 = m => x(m.sender.agent);
+const messageX2 = m => x(m.receiver.agent);
 const messageY = m => y(m.sendTime); 
 
 function labelX() {

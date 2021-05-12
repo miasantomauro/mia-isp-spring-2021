@@ -9,6 +9,7 @@ const timeslotHeight = 80;
 const agentWidth = 300;
 let boxHeight = 130;
 const boxWidth = 200;
+const LINE_HEIGHT = 20;
 const RED = '#E54B4B';
 const BLUE = '#0495C2';
 const GREEN = '#19EB0E';
@@ -27,14 +28,13 @@ const timeslots = Timeslot.atoms(true);
 const agents = name.atoms(true);
 const messages = Message.atoms(true);
 
+// map from name -> role
 const roles = {}
 agent.tuples().forEach(x => {
     let role = x.atoms()[0].toString();
     let name = x.atoms()[1].toString()
     roles[name] = role;
 });
-
-console.log(roles);
 
 // map from Timeslot -> Agent -> [Data]
 const learnedInformation = {};
@@ -372,6 +372,7 @@ function wrapText(container, text, width, x, y, color) {
         return 0;
     }
 
+    // this will be replaced if the text ends up overflowing past the given width
     const textElt = container.append('text')
         .attr('x', x)
         .attr('y', y)
@@ -380,37 +381,35 @@ function wrapText(container, text, width, x, y, color) {
         .text(text);
 
     const w = textElt.node().getComputedTextLength();
-    const r = width / w; // w shouldn't be zero
+    const r = width / w; // w shouldn't be zero because text is non-empty
     if (r < 1) {
 
-        const l = text.length;
-        let index = Math.round(r * l); // TODO: check
-        const spaceIndex = spaceBefore(text, index);
+        // remove the original text
+        textElt.node().remove();
 
-        
+        // math
+        const l = text.length;
+        let index = Math.round(r * l);
+        const spaceIndex = spaceBefore(text, index);
         index = (spaceIndex === -1) ? index : spaceIndex;
-        // TODO: break on nearest space?
         const before = text.slice(0, index);
         const after = text.slice(index);
 
-        textElt.node().remove();
-
-        const temp = container.append('text')
+        // append the "before" text
+        container.append('text')
             .attr('x', x) 
             .attr('y', y)
             .style('font-family', '"Open Sans", sans-serif')
             .style('fill', color)
             .text(before);
 
-        const h = 20; // TEMP: get text height
-
-        return h + wrapText(container, after, width, x, y + h, color);
+        // recur on the "after" text
+        return LINE_HEIGHT + wrapText(container, after, width, x, y + LINE_HEIGHT, color);
         
     }
 
-    return 20; // TEMP: get text height
-
-    
+    return LINE_HEIGHT;
+  
 }
 
 function displayInfo(container, info, x, y, color) {
@@ -442,7 +441,7 @@ function displayInfo(container, info, x, y, color) {
             .attr('dx', 5)
             .attr('dy', 5);
 
-        h+=20;
+        h+=LINE_HEIGHT;
     }
 
     return h;
@@ -627,11 +626,11 @@ function render() {
 
                 let h = 0;
 
-                h += displayInfo(g, generatedInfo, boxX + 10, boxY + 20, GREEN);
+                h += displayInfo(g, generatedInfo, boxX + 10, boxY + LINE_HEIGHT, GREEN);
 
-                h += displayInfo(g, newInfo, boxX + 10, boxY + 20 + h, RED);
+                h += displayInfo(g, newInfo, boxX + 10, boxY + LINE_HEIGHT + h, RED);
 
-                h += displayInfo(g, oldInfo, boxX + 10, boxY + 20 + h, BLACK);
+                h += displayInfo(g, oldInfo, boxX + 10, boxY + LINE_HEIGHT + h, BLACK);
 
                 // TODO: calculate the resulting height and offset the next group of information
                 
