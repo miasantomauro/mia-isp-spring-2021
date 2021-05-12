@@ -190,7 +190,7 @@ pred originates[s: strand, d: mesg] {
   --   t subterm of term(n) and
   --   whenever n' precedes n on the same strand, t is not subterm of n'
 
-  some m: sender.s | { -- messages sent by strand a (positive term)     
+  some m: sender.s | { -- messages sent by strand s (positive term)     
       d in subterm[m.data] -- d is a sub-term of m     
       all m2: (sender.s + receiver.s) - m | { -- everything else on the strand
           -- ASSUME: messages are sent/received in same timeslot
