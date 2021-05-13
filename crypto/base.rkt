@@ -45,7 +45,8 @@ sig Timeslot {
 -- As names are sent messagest, they learn pieces of data --
 sig name extends mesg {
   learned_times: set mesg -> Timeslot,
-  generated_times: set text -> Timeslot
+  generated_times: set text -> Timeslot,
+  workspace: set Timeslot -> mesg -> mesg
 }
 
 sig strand {
@@ -86,7 +87,23 @@ pred wellformed {
 
   -- someone cannot send a message to themselves
   all m: Message | m.sender not in m.receiver
-  
+
+
+  -- workspace: workaround to avoid cyclic justification within just deconstructions
+  --  e.g., knowing or receiving enc(x, x)
+  all d: mesg | all t: Timeslot | all a: name | all superterm: mesg | d in a.workspace[t][superterm] iff {
+    -- received in the clear just now (base case)
+    {some m: Message | {d in m.data and t = m.sendTime and m.receiver.agent = a} and superterm = d}
+    or
+    -- breaking down a ciphertext we learned before, or that we've produced from something larger this timeslot
+    --     via a key we learned before, or that we've produced from something larger in this timeslot
+    {superterm in Ciphertext and
+     d in superterm.plaintext and     
+     superterm in (a.learned_times).(Timeslot - t.^next) + a.workspace[t][mesg] and
+     getInv[superterm.encryptionKey] in (a.learned_times).(Timeslot - t.^next) + a.workspace[t][mesg] 
+    }  
+  }
+ 
   -- names only learn information that associated strands are explicitly sent 
   all d: mesg | all t: Timeslot | all a: name | d->t in a.learned_times iff {
     -- they have not already learned the mesg -- 
@@ -106,12 +123,8 @@ pred wellformed {
     -- consider: (k1, enc(k2, enc(n1, invk(k2)), invk(k1)))
     -- or, worse: (k1, enc(x, invk(k3)), enc(k2, enc(k3, invk(k2)), invk(k1)))
     { {some m: Message | m.receiver.agent = a and m.sendTime = t}
-      {some c: Ciphertext | 
-        d in c.plaintext and 
-        c in (a.learned_times).(Timeslot - t.^next) and
-        getInv[c.encryptionKey] in (a.learned_times).(Timeslot - t.^next)
-      }
-    }
+      d in a.workspace[t][mesg] -- derived from deconstructing anything in this timeslot
+    }   
     or 
     -- construct encrypted terms (only allow at NON-reception time; see above)
     -- NOTE WELL: if ever allow an agent to send/receive at same time, need rewrite 
