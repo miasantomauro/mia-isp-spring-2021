@@ -31,12 +31,16 @@
   (non-orig (invk a) (invk b))
   (comment "Analyze from the responder's perspective"))
 
-(defskeleton blanchet
-  (vars (a b akey) (s skey) (d data))
-  (defstrand init 2 (a a) (b b) (s s) (d d))
-  (deflistener d)
-  (non-orig (invk b))
-  (comment "From the initiator's perspective, is the secret leaked?"))
+; The scenario the manual describes shows the *responder*'s value
+; being compromised, but not the initiator's. Right now, our model
+; will create a constraint for both listeners (conjuctively), yielding
+; a spurious unsat result unless the initiator's deflistener is removed.
+;(defskeleton blanchet
+;  (vars (a b akey) (s skey) (d data))
+;  (defstrand init 2 (a a) (b b) (s s) (d d))
+;  (deflistener d)
+;  (non-orig (invk b))
+;  (comment "From the initiator's perspective, is the secret leaked?"))
 
 (defskeleton blanchet
   (vars (a b akey) (s skey) (d data))
@@ -60,8 +64,8 @@
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
-               (Timeslot 6 6) 
-               (Message 6 6)
+               (Timeslot 4 4) 
+               (Message 4 4)
                
                (mesg 20) ; 9 + 3 + 3 + 5
                
