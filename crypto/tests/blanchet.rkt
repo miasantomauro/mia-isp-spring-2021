@@ -58,7 +58,7 @@
                constrain_skeleton_blanchet_0
                constrain_skeleton_blanchet_1
                constrain_skeleton_blanchet_2
-               constrain_skeleton_blanchet_3
+               ; constrain_skeleton_blanchet_3 ; note this is the fourth skeleton if including commented out
                temporary
                wellformed
                ]
@@ -89,8 +89,7 @@
                
                (skeleton_blanchet_0 1 1)
                (skeleton_blanchet_1 1 1)
-               (skeleton_blanchet_2 1 1)
-               (skeleton_blanchet_3 1 1)
+               (skeleton_blanchet_2 1 1)               
                (Int 5)
                ]
       ;#:expect sat

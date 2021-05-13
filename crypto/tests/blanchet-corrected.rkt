@@ -82,8 +82,7 @@
                exec_blanchet-corrected_resp
                constrain_skeleton_blanchet-corrected_0
                constrain_skeleton_blanchet-corrected_1
-               constrain_skeleton_blanchet-corrected_2
-               constrain_skeleton_blanchet-corrected_3
+               constrain_skeleton_blanchet-corrected_2 ; note this is the fourth skeleton including commented-out               
                temporary
                wellformed
                               ]
@@ -114,8 +113,7 @@
                
                (skeleton_blanchet-corrected_0 1 1)
                (skeleton_blanchet-corrected_1 1 1)
-               (skeleton_blanchet-corrected_2 1 1)
-               (skeleton_blanchet-corrected_3 1 1)
+               (skeleton_blanchet-corrected_2 1 1)               
                (Int 5)
                ]
       ;#:expect sat
