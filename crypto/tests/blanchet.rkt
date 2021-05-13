@@ -61,6 +61,10 @@
                ; constrain_skeleton_blanchet_3 ; note this is the fourth skeleton if including commented out
                temporary
                wellformed
+
+               ; The attacker has no long-term keys
+               (no (+ (join Attacker (join name (join KeyPairs ltks)))
+                      (join name (join Attacker (join KeyPairs ltks)))))
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
