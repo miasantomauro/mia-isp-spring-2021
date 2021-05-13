@@ -48,8 +48,8 @@
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
-               (Timeslot 9 9) ; should only need 8; testing unused timeslots
-               (Message 9 9)
+               (Timeslot 4 4) ; 4 steps for reflection attack
+               (Message 4 4)
                
                (mesg 20) ; 9 + 3 + 3 + 5
                
