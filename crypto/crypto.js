@@ -1,7 +1,3 @@
-// TODOs
-// - better text formatting (https://www.npmjs.com/package/d3-textwrap)
-// - dropped / tampered messages (?)
-
 // constants for our visualization
 const baseX = 150;
 const baseY = 100;
@@ -25,15 +21,15 @@ d3.select(svg)
 
 // data from forge spec
 const timeslots = Timeslot.atoms(true);
-const agents = name.atoms(true);
+const strands = strand.atoms(true);
 const messages = Message.atoms(true);
 
-// map from name -> role
+// map from role -> name
 const roles = {}
 agent.tuples().forEach(x => {
     let role = x.atoms()[0].toString();
-    let name = x.atoms()[1].toString()
-    roles[name] = role;
+    let name = x.atoms()[1].toString();
+    roles[role] = name;
 });
 
 // map from Timeslot -> Agent -> [Data]
@@ -49,11 +45,11 @@ const pubKeyMap = {};
 // map from private key (Datum) -> owner (Agent)
 const privKeyMap = {};
 
-const agentNames = agents.map(x => x.toString());
+const agentNames = strands.map(x => x.toString());
 const keyNames = Key.atoms(true).map(x => x.toString());
 
 // populating the learnedInformation object
-agents.forEach((agent) => {
+strands.forEach((agent) => {
 
     let a = agent.toString();
 
@@ -104,7 +100,7 @@ agents.forEach((agent) => {
 // populating the visibleInformation object (initializing everything with false)
 timeslots.forEach((timeslot) => {
     const ts = timeslot.toString();
-    agents.forEach((agent) => {
+    strands.forEach((agent) => {
         const a = agent.toString();
 
         if (!visibleInformation[ts]) {
@@ -154,7 +150,7 @@ function getTimeSlotsBefore(timeslot) {
  * @param {Object} agent - an agent prop from the forge spec
  */
 function x(agent) {
-    return baseX + (agents.indexOf(agent) * agentWidth);
+    return baseX + (agentNames.indexOf(agent.toString()) * agentWidth);
 }
 
 /**
@@ -170,8 +166,8 @@ function y(timeslot) {
         // if there is an agent with info visible in this timeslot, count it
         let i;
         let v = false;
-        for (i = 0; i < agents.length; i++) {
-            let a = agents[i].toString();
+        for (i = 0; i < strands.length; i++) {
+            let a = strands[i].toString();
             if (visibleInformation[ts][a]) {
                 v = true;
             }
@@ -190,7 +186,7 @@ function y(timeslot) {
  * @param {Object} m - a message prop from the forge spec
  */
  function messageX1(m) {
-    return x(m.sender.agent);
+    return x(m.sender);
 }
 
 /**
@@ -199,7 +195,7 @@ function y(timeslot) {
  * @param {Object} m - a message prop from the forge spec
  */
 function messageX2(m) {
-    return x(m.receiver.agent);
+    return x(m.receiver);
 }
 
 /**
@@ -292,7 +288,7 @@ function centerText() {
 function onMouseClick(mouseevent, timeslot) {
     const ts = timeslot.toString();
 
-    agents.forEach((agent) => {
+    strands.forEach((agent) => {
         const a = agent.toString();
         visible = visibleInformation[ts][a];
         visibleInformation[ts][a] = !visible;
@@ -458,7 +454,7 @@ function render() {
         .join('line')
         .attr('x1', baseX)
         .attr('y1', y)
-        .attr('x2', baseX + ((agents.length - 1) * agentWidth))
+        .attr('x2', baseX + ((strands.length - 1) * agentWidth))
         .attr('y2', y)
         .attr('stroke', BLACK)
         .attr('fill', 'white')
@@ -479,7 +475,7 @@ function render() {
     // draw the agents
     const a = d3.select(svg)
         .selectAll('agent')
-        .data(agents)
+        .data(strands)
         .join('line')
         .attr('stroke', BLUE)
         .style('stroke-width', 10)
@@ -491,23 +487,26 @@ function render() {
     // label the strands with their names
     const aLabel = d3.select(svg)
         .selectAll('agentLabel')
-        .data(agents)
+        .data(strands)
         .join('text')
         .attr('x', x)
         .attr('y', baseY - 40)
         .style('font-family', '"Open Sans", sans-serif')
-        .text((a) => `${a.toString()} (${roles[a.toString()]})`);
+        .text((a) => {
+            return `${a.toString()} (${roles[a.toString()]})`;
+        });
 
+        /*
     // label the strands with their roles
     const aLabel2 = d3.select(svg)
         .selectAll('agentLabel')
-        .data(agents)
+        .data(strands)
         .join('text')
         .attr('x', x)
         .attr('y', baseY - 60)
         .style('font-family', '"Open Sans", sans-serif')
         .text((a) => roles[a.toString()]);
-
+*/
     // bind messages to m
     const m = d3.select(svg)
         .selectAll('message')
@@ -570,7 +569,7 @@ function render() {
 
     timeslots.forEach((timeslot) => {
         let ts = timeslot.toString();
-        agents.forEach((agent) => {
+        strands.forEach((agent) => {
             let a = agent.toString();
             if (visibleInformation[ts][a]) {
 
@@ -626,7 +625,7 @@ function render() {
 
                 let h = 0;
 
-                h += displayInfo(g, generatedInfo, boxX + 10, boxY + LINE_HEIGHT, GREEN);
+                h += displayInfo(g, generatedInfo, boxX + 10, boxY + LINE_HEIGHT, BLUE);
 
                 h += displayInfo(g, newInfo, boxX + 10, boxY + LINE_HEIGHT + h, RED);
 
