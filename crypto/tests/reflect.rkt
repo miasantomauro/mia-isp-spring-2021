@@ -48,23 +48,22 @@
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
-               (Timeslot 4 4) ; 4 steps for reflection attack
-               (Message 4 4)
+               (Timeslot 4 4) ; 4 steps for reflection attack               
                
-               (mesg 20) ; 9 + 3 + 3 + 5
+               (mesg 13) ; 9 + 3 + 0 + 4
                
-               (Key 9)
+               (Key 6)
                (akey 6)               
                (PrivateKey 3)
                (PublicKey 3)
-               (skey 3)
+               (skey 0)
                
                (name 3)
                (Attacker 1 1)
                
-               (text 3) ; includes data
+               (text 0) ; includes data
                
-               (Ciphertext 5 5)               
+               (Ciphertext 4 4)               
                
                (AttackerStrand 1 1)                              
                (reflect_init 1 1)

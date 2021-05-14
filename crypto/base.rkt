@@ -108,7 +108,10 @@ pred wellformed {
     --     via a key we learned *previously*, or that we've produced from something larger in this timeslot
     --  Note use of "previously" by subtracting the *R*TC is crucial in preventing cyclic justification.
     -- the baseKnown function includes e.g. an agent's private key, otherwise "prior knowledge" is empty (even of their private key)
-    {t.receiver.agent = a and {some superterm : Ciphertext | {      
+    { t.receiver.agent = a and -- only populate workspace if we're receiving something new
+      -- TODO try?
+      --d not in ((a.workspace)[t])[Timeslot - microt.^next] and -- first time appearing
+      {some superterm : Ciphertext | {      
       d in superterm.plaintext and     
       superterm in (a.learned_times).(Timeslot - t.*next) + a.workspace[t][Timeslot - microt.*next] + baseKnown[a] and
       getInv[superterm.encryptionKey] in (a.learned_times).(Timeslot - t.*next) + a.workspace[t][Timeslot - microt.*next] + baseKnown[a]

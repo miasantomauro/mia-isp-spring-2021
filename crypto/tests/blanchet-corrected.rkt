@@ -81,7 +81,6 @@
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
                (Timeslot 4 4) 
-               (Message 4 4)
                
                (mesg 20) ; 9 + 3 + 3 + 5
                
@@ -136,8 +135,7 @@
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
-               (Timeslot 4 4) 
-               (Message 4 4)
+               (Timeslot 4 4)                
                
                (mesg 20) ; 9 + 3 + 3 + 5
                

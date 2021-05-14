@@ -3,7 +3,7 @@
 
 (set-option! 'verbose 5)
 (set-option! 'solver 'MiniSatProver)
-;(set-option! 'skolem_depth 2)
+(set-option! 'skolem_depth 2)
 (set-option! 'sb 20000)
 (set-option! 'logtranslation 1)
 (set-option! 'coregranularity 1)
@@ -36,7 +36,7 @@
   (non-orig (ltk a s) (ltk b s))
   (uniq-orig nb))
 
-(run OR_SAT
+(test OR_SAT
       #:preds [
                exec_or_init
                exec_or_resp
@@ -47,10 +47,9 @@
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
-               (Timeslot 9 9) ; should only need 8; testing unused timeslots
-               (Message 9 9)
+               (Timeslot 8 8) ; recv + send (recall attacker is medium)
                
-               (mesg 20) ; 9 + 3 + 3 + 5
+               (mesg 21) ; 9 + 4 + 3 + 5
                
                (Key 9)
                (akey 6)               
@@ -58,7 +57,7 @@
                (PublicKey 3)
                (skey 3)
                
-               (name 3)
+               (name 4) ; attacker plus server, init, resp's agents
                (Attacker 1 1)
                
                (text 3) ; includes data
@@ -73,12 +72,12 @@
                (skeleton_or_0 1 1)              
                (Int 5 5) 
                ]
-      ;#:expect sat
+      #:expect sat
       )
 
 ;(printf "~a~n" exec_or_serv)
 
-(display OR_SAT)
+;(display OR_SAT)
 ;(is-sat? OR_SAT)
 ; This will auto-highlight if settings are correct
 ; (tree:get-value (forge:Run-result NS_SAT))
