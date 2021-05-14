@@ -81,8 +81,7 @@
                (Key 6 6)
                (name 3 3)
                (KeyPairs 1 1)
-               (Timeslot 6 6) ; TODO: for opt, consider merge with Message?
-               (Message 6 6) ; not "mesg"
+               (Timeslot 6 6) 
                (text 2 2)
                (Ciphertext 5 5)
                (AttackerStrand 1 1)
@@ -115,8 +114,7 @@
                (Key 6 6)
                (name 3 3)
                (KeyPairs 1 1)
-               (Timeslot 6 6) ; TODO: for opt, consider merge with Message?
-               (Message 6 6) ; not "mesg"
+               (Timeslot 6 6)
                (text 2 2)
                (Ciphertext 5 5)
                (AttackerStrand 1 1)

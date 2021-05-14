@@ -39,7 +39,13 @@ fun getInv[k: Key]: one Key {
 
 -- t=0, t=1, ...
 sig Timeslot {
-  next: lone Timeslot
+  -- structure of time
+  next: lone Timeslot,
+  
+  -- <=1 actual "message" per timeslot
+  sender: one strand,
+  receiver: one strand,  
+  data: set mesg
 }
 
 -- As names are sent messagest, they learn pieces of data --
@@ -67,16 +73,6 @@ sig Ciphertext extends mesg {
 -- Non-name base value (e.g., nonces)
 sig text extends mesg {}
 
--- {foo}_B
--- Note: this is NOT the same as "mesg"
-sig Message {
-  -- Support delays, non-reception
-  sender: one strand,
-  receiver: one strand,
-  sendTime: one Timeslot,
-  data: set mesg
-}
-
 fun baseKnown[a: name]: set mesg {
     -- name knows all public keys
     PublicKey
@@ -94,32 +90,29 @@ fun baseKnown[a: name]: set mesg {
 pred wellformed {
   -- Design choice: only one message event per timeslot;
   --   assume we have a shared notion of time
-  
-  all t: Timeslot | lone sendTime.t 
-
+    
   -- You cannot send a message with no data
-  all m: Message | some m.data
+  all m: Timeslot | some m.data
 
   -- someone cannot send a message to themselves
-  all m: Message | m.sender not in m.receiver
-
+  all m: Timeslot | m.sender not in m.receiver
 
   -- workspace: workaround to avoid cyclic justification within just deconstructions
   --  e.g., knowing or receiving enc(x, x)
   -- AGENT -> TICK -> MICRO-TICK LEARNED_SUBTERM
   all d: mesg | all t: Timeslot | all a: name | all microt: Timeslot | d in ((a.workspace)[t])[microt] iff {
     -- received in the clear just now (base case)
-    {some m: Message | {d in m.data and t = m.sendTime and m.receiver.agent = a} and no microt.~next}
+    {d in t.data and t.receiver.agent = a and no microt.~next}
     or
     -- breaking down a ciphertext we learned *previously*, or that we've produced from something larger this timeslot
     --     via a key we learned *previously*, or that we've produced from something larger in this timeslot
     --  Note use of "previously" by subtracting the *R*TC is crucial in preventing cyclic justification.
     -- the baseKnown function includes e.g. an agent's private key, otherwise "prior knowledge" is empty (even of their private key)
-    {some superterm : Ciphertext | {      
+    {t.receiver.agent = a and {some superterm : Ciphertext | {      
       d in superterm.plaintext and     
       superterm in (a.learned_times).(Timeslot - t.*next) + a.workspace[t][Timeslot - microt.*next] + baseKnown[a] and
       getInv[superterm.encryptionKey] in (a.learned_times).(Timeslot - t.*next) + a.workspace[t][Timeslot - microt.*next] + baseKnown[a]
-    }}  
+    }}}
   }
  
   -- names only learn information that associated strands are explicitly sent 
@@ -141,7 +134,7 @@ pred wellformed {
     -- might think to write an accessibleSubterms function as below, except:
     -- consider: (k1, enc(k2, enc(n1, invk(k2)), invk(k1)))
     -- or, worse: (k1, enc(x, invk(k3)), enc(k2, enc(k3, invk(k2)), invk(k1)))
-    { {some m: Message | m.receiver.agent = a and m.sendTime = t}
+    { t.receiver.agent = a
       d in a.workspace[t][Timeslot] -- derived in any micro-tick in this (reception) timeslot
     }   
     or 
@@ -150,8 +143,8 @@ pred wellformed {
     {d in Ciphertext and 
 	   d.encryptionKey in (a.learned_times).(Timeslot - t.^next) and        
 	   d.plaintext in (a.learned_times).(Timeslot - t.^next)
-     {no m: Message | m.receiver.agent = a and m.sendTime = t} -- non-reception
-     }
+     {a not in t.receiver.agent} -- non-reception
+    }
     or 
 
     {d in baseKnown[a]}
@@ -165,9 +158,9 @@ pred wellformed {
   all a: name | all d: text | lone t: Timeslot | d in (a.generated_times).t
 
   -- Messages comprise only values known by the sender
-  all m: Message | m.data in (((m.sender).agent).learned_times).(Timeslot - (m.sendTime).^next) 
-
-  all m: Message | m.sender = AttackerStrand or m.receiver = AttackerStrand 
+  all m: Timeslot | m.data in (((m.sender).agent).learned_times).(Timeslot - m.^next) 
+  -- Always send or receive to the adversary
+  all m: Timeslot | m.sender = AttackerStrand or m.receiver = AttackerStrand 
 
   -- plaintext relation is acyclic  
   --  NOTE WELL: if ever add another type of mesg that contains data, + inside ^.
@@ -217,7 +210,7 @@ pred originates[s: strand, d: mesg] {
       d in subterm[m.data] -- d is a sub-term of m     
       all m2: (sender.s + receiver.s) - m | { -- everything else on the strand
           -- ASSUME: messages are sent/received in same timeslot
-          {m2.sendTime in m.sendTime.^(~(next))}
+          {m2 in m.^(~(next))}
           implies          
           {d not in subterm[m2.data]}
       }

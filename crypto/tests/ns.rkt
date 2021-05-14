@@ -57,13 +57,6 @@
              (join ns_init ns_init_n2))
            (join Attacker learned_times Timeslot)))
 
-; Proxy for concrete attack, used to debug and sanity check:
-; some message is sent encrypted with the attacker's public key
-(pred proxy_shape
-      (some ((m Message)) (in (getInv (join (join m data) encryptionKey))
-                              (join KeyPairs owners Attacker ))))              ; unsat
-                              ; (join KeyPairs owners (join ns_init agent) )))) ; sat
-
 (pred success      
       (in (+ (join ns_init ns_init_n1)
              (join ns_init ns_init_n2))
@@ -86,7 +79,6 @@
             (join ns_init ns_init_n2))))
 
 
-
 (test NS_sanity
       #:preds [
                exec_ns_init
@@ -104,8 +96,7 @@
                (Key 6 6)
                (name 3 3)
                (KeyPairs 1 1)
-               (Timeslot 6 6) ; TODO: for opt, consider merge with Message?
-               (Message 6 6) ; not "mesg"
+               (Timeslot 6 6)
                (text 2 2)
                (Ciphertext 5 5)
                (AttackerStrand 1 1)
@@ -123,7 +114,7 @@
       #:expect sat
       )
 
-(run NS_SAT
+(run NS_attack
       #:preds [
                exec_ns_init
                exec_ns_resp
@@ -132,9 +123,7 @@
                temporary
                wellformed
                
-              ; (! attack_exists)
                attack_exists
-               ;proxy_shape
                success
                attack_frame
                ]
@@ -143,8 +132,7 @@
                (Key 6 6)
                (name 3 3)
                (KeyPairs 1 1)
-               (Timeslot 6 6) ; TODO: for opt, consider merge with Message?
-               (Message 6 6) ; not "mesg"
+               (Timeslot 6 6)
                (text 2 2)
                (Ciphertext 5 5)
                (AttackerStrand 1 1)
@@ -162,7 +150,7 @@
       ;#:expect sat
       )
 
-(display NS_SAT)
+(display NS_attack)
 ; This will auto-highlight if settings are correct
 ; (tree:get-value (forge:Run-result NS_SAT))
 ;(is-sat? NS_SAT)

@@ -249,9 +249,9 @@
 (define-for-syntax (build-event-assertion pname rname this-strand ev msg prev-msg)  
   ;(printf "ast-event-contents ev: ~a~n" (ast-event-contents ev))
   ; First, assert temporal ordering on this message variable; msg happens strictly after prev-msg unless no prev-msg
-  #`(&& #,(if prev-msg
-               #`(in (join #,msg sendTime) (join #,prev-msg sendTime (^ next)))
-               #`true)
+  #`(&& ;#,(if prev-msg
+        ;       #`(in (join #,msg sendTime) (join #,prev-msg sendTime (^ next)))
+        ;       #`true)
 
          ; Assert event constraints
          ; Sender or receiver
@@ -360,13 +360,19 @@
      (error (format "unexpected cat in datum-sat->expr: ~a" t))]))
   
 (define-for-syntax (build-role-predicate-body pname rname rolesig a-trace role-decls vars)  
-  ; E.g., ((msg0 . (rel Message)) (msg1 . (- (rel Message) msg0)) (msg2 . (- (- (rel Message) msg1) msg0)))
-  (let ([msg-var-decls (for/list ([ev (ast-trace-events a-trace)]
-                                  [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
-                         #`[#,(format-id (ast-event-origstx ev) "msg~a" i)
-                            #,(foldr (lambda (idx sofar) #`(- #,sofar #,(format-id (ast-event-origstx ev) "msg~a" idx)))
-                                     #'Message
-                                     (build-list i (lambda (x) x)))])])
+  ; E.g., ((t0 . (rel Timeslot)) (t1 . (join t0 (^ next)) 
+  (let ([msg-var-decls
+         (for/list ([ev (ast-trace-events a-trace)]
+                    [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
+           #`[#,(format-id (ast-event-origstx ev) "t~a" i)
+              #,(if (equal? i 0)
+                    #'Timeslot
+                    #`(join #,(format-id (ast-event-origstx ev) "t~a" (- i 1)) (^ next)))])])
+    
+    ; (foldr (lambda (idx sofar) #`(- #,sofar #,(format-id (ast-event-origstx ev) "msg~a" idx)))
+    ;          #'Timeslot
+    ;          (build-list i (lambda (x) x)))])])
+
     ; Add constraints for every one of the above message variables
     ; Trace structure for this role, plus temporal ordering
     (with-syntax ([rv (format-id rolesig "arbitrary_~a" rolesig)])
@@ -379,16 +385,21 @@
                    (let ([v (first vt)])                     
                      #`(one (join rv #,(id->strand-var pname rname v))))) 
               ; trace assertions
-              (some (#,@msg-var-decls)
-                    (&&                                        
-                     #,@(for/list ([ev (ast-trace-events a-trace)]
-                                   [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
-                          (let ([msg (format-id (ast-event-origstx ev) "msg~a" i)]
-                                [prev-msg (if (> i 0) (format-id (ast-event-origstx ev) "msg~a"  (- i 1)) #f)])
-                            (build-event-assertion pname rname #'rv ev msg prev-msg)))))
-              ))
-      )))
+              #,(wrap-msg-vars
+                 (reverse msg-var-decls)
+                 #`(&&                                        
+                    #,@(for/list ([ev (ast-trace-events a-trace)]
+                                  [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
+                         (let ([msg (format-id (ast-event-origstx ev) "t~a" i)]
+                               [prev-msg (if (> i 0) (format-id (ast-event-origstx ev) "t~a"  (- i 1)) #f)])
+                           (build-event-assertion pname rname #'rv ev msg prev-msg))))))))))
 
+(define-for-syntax (wrap-msg-vars var-decls stx)
+  (if (equal? '() var-decls)
+      stx
+      (wrap-msg-vars
+       (cdr var-decls)
+       #`(some (#,(car var-decls)) #,stx))))
 
 (define-for-syntax (struct->name a-struct)
   (define-values (t s) (struct-info a-struct))
