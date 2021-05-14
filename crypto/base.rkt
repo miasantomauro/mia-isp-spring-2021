@@ -245,6 +245,12 @@ pred temporary {
 
   -- number of keys greater than 0
   #Key > 0
+
+  -- abstractness performance experiment
+  --all m : mesg | m in Key + name + Ciphertext + text
+  --all k : Key | k in skey + akey
+  --all ak : akey | ak in PrivateKey + PublicKey
+
 }
 
 /*

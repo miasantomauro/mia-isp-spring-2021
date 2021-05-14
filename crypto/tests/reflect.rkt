@@ -52,13 +52,13 @@
                
                (mesg 13) ; 9 + 3 + 0 + 4
                
-               (Key 6)
-               (akey 6)               
-               (PrivateKey 3)
-               (PublicKey 3)
+               (Key 6 6)
+               (akey 6 6)               
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
                (skey 0)
                
-               (name 3)
+               (name 3 3)
                (Attacker 1 1)
                
                (text 0) ; includes data

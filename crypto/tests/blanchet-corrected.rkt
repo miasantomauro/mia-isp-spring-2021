@@ -70,13 +70,11 @@
                ; The attacker has no long-term keys
                (no (+ (join Attacker (join name (join KeyPairs ltks)))
                       (join name (join Attacker (join KeyPairs ltks)))))
-               ; initiator's a and b are public keys, and not for the attacker               
+               ; initiator's a and b are public keys
                ;   - without this we get odd CEs since the model doesn't prevent matching against unopenable encs
                ;   - ideally some of this would be enforced by non-orig anyway
                (in (join blanchet-corrected_init blanchet-corrected_init_a) PublicKey)
-               (in (join blanchet-corrected_init blanchet-corrected_init_b) PublicKey)
-               (no (& (getInv (join blanchet-corrected_init blanchet-corrected_init_a))
-                      (join KeyPairs owners Attacker)))
+               (in (join blanchet-corrected_init blanchet-corrected_init_b) PublicKey)               
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
@@ -84,16 +82,16 @@
                
                (mesg 16) ; 9 + 3 + 3 + 5 vs. 7 + 1 + 3 + 5
                
-               (Key 7)
+               (Key 8)
                (akey 6)               
                (PrivateKey 3)
                (PublicKey 3)
-               (skey 1)
+               (skey 2)
                
                (name 3)
                (Attacker 1 1)
                
-               (text 1) ; includes data
+               (text 2) ; includes data
                
                (Ciphertext 5 5)               
                
@@ -138,16 +136,16 @@
                (Timeslot 4 4)                              
                (mesg 16) ; 9 + 3 + 3 + 5 vs. 7 + 1 + 3 + 5
                
-               (Key 7)
-               (akey 6)               
-               (PrivateKey 3)
-               (PublicKey 3)
-               (skey 1)
+               (Key 7 7)
+               (akey 6 6)               
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
+               (skey 1 1)
                
-               (name 3)
+               (name 3 3)
                (Attacker 1 1)
                
-               (text 1) ; includes data
+               (text 1 1) ; includes data
                
                (Ciphertext 5 5)               
                

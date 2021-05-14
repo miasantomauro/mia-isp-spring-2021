@@ -65,27 +65,27 @@
                ; The attacker has no long-term keys
                (no (+ (join Attacker (join name (join KeyPairs ltks)))
                       (join name (join Attacker (join KeyPairs ltks)))))
-               ; Don't encrypt using the Attacker's public key.
+               ; initiator's a and b are public keys
                ;   - without this we get odd CEs since the model doesn't prevent matching against unopenable encs
-               ;   - ideally this would be enforced by non-orig anyway
-               (no (& (join Ciphertext encryptionKey)
-                      (join KeyPairs owner Attacker)))
+               ;   - ideally some of this would be enforced by non-orig anyway
+               (in (join blanchet_init blanchet_init_a) PublicKey)
+               (in (join blanchet_init blanchet_init_b) PublicKey)
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
                (Timeslot 4 4)                               
                (mesg 20) ; 9 + 3 + 3 + 5
                
-               (Key 9)
-               (akey 6)               
-               (PrivateKey 3)
-               (PublicKey 3)
-               (skey 3)
+               (Key 8 8)
+               (akey 6 6)               
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
+               (skey 2 2) ; allow extra to see compromise
                
-               (name 3)
+               (name 3 3)
                (Attacker 1 1)
                
-               (text 3) ; includes data
+               (text 2 2) ; allow extra to see compromise
                
                (Ciphertext 5 5)               
                
