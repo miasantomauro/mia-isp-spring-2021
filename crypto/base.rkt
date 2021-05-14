@@ -45,15 +45,17 @@ sig Timeslot {
   -- <=1 actual "message" per timeslot
   sender: one strand,
   receiver: one strand,  
-  data: set mesg
+  data: set mesg,
+
+  -- relation is: Tick x Microtick x learned-mesg
+  -- Only one agent per tick is receiving, so always know which agent's workspace it is
+  workspace: set Timeslot -> mesg
 }
 
 -- As names are sent messagest, they learn pieces of data --
 sig name extends mesg {
   learned_times: set mesg -> Timeslot,
-  generated_times: set text -> Timeslot,
-  -- Agent x Tick x Microtick x learned-mesg
-  workspace: set Timeslot -> Timeslot -> mesg
+  generated_times: set text -> Timeslot
 }
 
 sig strand {
@@ -100,21 +102,21 @@ pred wellformed {
   -- workspace: workaround to avoid cyclic justification within just deconstructions
   --  e.g., knowing or receiving enc(x, x)
   -- AGENT -> TICK -> MICRO-TICK LEARNED_SUBTERM
-  all d: mesg | all t: Timeslot | all a: name | all microt: Timeslot | d in ((a.workspace)[t])[microt] iff {
+  all d: mesg | all t: Timeslot | all microt: Timeslot | let a = t.receiver.agent | d in (workspace[t])[microt] iff {
     -- received in the clear just now (base case)
-    {d in t.data and t.receiver.agent = a and no microt.~next}
+    {d in t.data and no microt.~next}
     or
     -- breaking down a ciphertext we learned *previously*, or that we've produced from something larger this timeslot
     --     via a key we learned *previously*, or that we've produced from something larger in this timeslot
     --  Note use of "previously" by subtracting the *R*TC is crucial in preventing cyclic justification.
     -- the baseKnown function includes e.g. an agent's private key, otherwise "prior knowledge" is empty (even of their private key)
-    { t.receiver.agent = a and -- only populate workspace if we're receiving something new
+    { 
       -- TODO try?
       --d not in ((a.workspace)[t])[Timeslot - microt.^next] and -- first time appearing
       {some superterm : Ciphertext | {      
       d in superterm.plaintext and     
-      superterm in (a.learned_times).(Timeslot - t.*next) + a.workspace[t][Timeslot - microt.*next] + baseKnown[a] and
-      getInv[superterm.encryptionKey] in (a.learned_times).(Timeslot - t.*next) + a.workspace[t][Timeslot - microt.*next] + baseKnown[a]
+      superterm in (a.learned_times).(Timeslot - t.*next) + workspace[t][Timeslot - microt.*next] + baseKnown[a] and
+      getInv[superterm.encryptionKey] in (a.learned_times).(Timeslot - t.*next) + workspace[t][Timeslot - microt.*next] + baseKnown[a]
     }}}
   }
  
@@ -138,7 +140,7 @@ pred wellformed {
     -- consider: (k1, enc(k2, enc(n1, invk(k2)), invk(k1)))
     -- or, worse: (k1, enc(x, invk(k3)), enc(k2, enc(k3, invk(k2)), invk(k1)))
     { t.receiver.agent = a
-      d in a.workspace[t][Timeslot] -- derived in any micro-tick in this (reception) timeslot
+      d in workspace[t][Timeslot] -- derived in any micro-tick in this (reception) timeslot
     }   
     or 
     -- construct encrypted terms (only allow at NON-reception time; see above)

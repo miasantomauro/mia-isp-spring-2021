@@ -56,7 +56,7 @@
 ;(set-option! 'skolem_depth 2)
 (set-option! 'sb 20000)
 
-#;(test blanchet_corrected_sanity
+(test blanchet_corrected_sanity
       #:preds [
                exec_blanchet-corrected_init
                exec_blanchet-corrected_resp
@@ -80,20 +80,20 @@
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
-               (Timeslot 4 4) 
+               (Timeslot 4 4)                
                
-               (mesg 20) ; 9 + 3 + 3 + 5
+               (mesg 16) ; 9 + 3 + 3 + 5 vs. 7 + 1 + 3 + 5
                
-               (Key 9)
+               (Key 7)
                (akey 6)               
                (PrivateKey 3)
                (PublicKey 3)
-               (skey 3)
+               (skey 1)
                
                (name 3)
                (Attacker 1 1)
                
-               (text 3) ; includes data
+               (text 1) ; includes data
                
                (Ciphertext 5 5)               
                
@@ -110,7 +110,7 @@
       #:expect sat
       )
 
-(run blanchet_corrected
+(test blanchet_corrected
       #:preds [
                exec_blanchet-corrected_init
                exec_blanchet-corrected_resp
@@ -135,20 +135,19 @@
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
-               (Timeslot 4 4)                
+               (Timeslot 4 4)                              
+               (mesg 16) ; 9 + 3 + 3 + 5 vs. 7 + 1 + 3 + 5
                
-               (mesg 20) ; 9 + 3 + 3 + 5
-               
-               (Key 9)
+               (Key 7)
                (akey 6)               
                (PrivateKey 3)
                (PublicKey 3)
-               (skey 3)
+               (skey 1)
                
                (name 3)
                (Attacker 1 1)
                
-               (text 3) ; includes data
+               (text 1) ; includes data
                
                (Ciphertext 5 5)               
                
@@ -162,7 +161,7 @@
                (skeleton_blanchet-corrected_2 1 1)               
                (Int 5)
                ]
-      ;#:expect unsat
+      #:expect unsat
       )
 
-(display blanchet_corrected)
+;(display blanchet_corrected)
