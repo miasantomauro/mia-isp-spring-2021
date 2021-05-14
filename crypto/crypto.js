@@ -244,16 +244,22 @@ function labelY() {
  * @returns a string containing the text for the label
  */
 function labelText(m) {
+    const pt = [];
     // grabbing the plaintext for this message's data
-    const pt = m.data.tuples().map(tuple => {
+    m.data.tuples().forEach(tuple => {
+        console.log(tuple.atoms()[0].toString());
+
         let datum = tuple.atoms()[0].plaintext.toString();
+        console.log(tuple.toString(), datum)
+
         if (pubKeyMap[datum]) {
-            return `pubK${pubKeyMap[datum]}`;
+            pt.push(`pubK${pubKeyMap[datum]}`);
         } else if (privKeyMap[datum]) {
             // TODO: would this ever happen?
-            return `privK${privKeyMap[datum]}`;
+            pt.push(`privK${privKeyMap[datum]}`);
         } else {
-            return datum;
+            // funky
+            pt.push(datum ? datum : tuple.toString());
         }
     });
     // TODO: more formatting (commas) ?
