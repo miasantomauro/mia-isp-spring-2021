@@ -3,7 +3,7 @@
 
 ; Sterling isn't displaying this right
 ;(set-option! 'skolem_depth 2)
-;(set-option! 'verbose 5)
+(set-option! 'verbose 2) ; see progress when running test cases
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Needham-Schroeder example from CSPA

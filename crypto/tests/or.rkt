@@ -2,13 +2,12 @@
 (require "../macrosketch.rkt")
 
 (set-option! 'verbose 5)
-;(set-option! 'solver 'MiniSatProver)
 (set-option! 'solver 'MiniSatProver)
 ;(set-option! 'skolem_depth 2)
 (set-option! 'sb 20000)
 (set-option! 'logtranslation 1)
 (set-option! 'coregranularity 1)
-(set-option! 'core_minimization 'rce)
+(set-option! 'core_minimization 'hybrid)
 
 
 (defprotocol or basic

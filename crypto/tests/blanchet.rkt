@@ -65,6 +65,11 @@
                ; The attacker has no long-term keys
                (no (+ (join Attacker (join name (join KeyPairs ltks)))
                       (join name (join Attacker (join KeyPairs ltks)))))
+               ; Don't encrypt using the Attacker's public key.
+               ;   - without this we get odd CEs since the model doesn't prevent matching against unopenable encs
+               ;   - ideally this would be enforced by non-orig anyway
+               (no (& (join Ciphertext encryptionKey)
+                      (join KeyPairs owner Attacker)))
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
