@@ -49,12 +49,12 @@ const agentNames = strands.map(x => x.toString());
 const keyNames = Key.atoms(true).map(x => x.toString());
 
 // populating the learnedInformation object
-strands.forEach((agent) => {
+strands.forEach((strand) => {
 
-    let a = agent.toString();
+    let s = strand.toString();
 
     // grab the learned_times data from the forge spec
-    const learned = agent.learned_times.tuples().map(tuple => tuple.atoms());
+    const learned = strand.agent.learned_times.tuples().map(tuple => tuple.atoms());
 
     learned.map((info) => {
         // unpack the information
@@ -65,18 +65,18 @@ strands.forEach((agent) => {
             learnedInformation[ts] = {};
         }
 
-        if (!learnedInformation[ts][a]) {
-            learnedInformation[ts][a] = [];
+        if (!learnedInformation[ts][s]) {
+            learnedInformation[ts][s] = [];
         }
 
         if (ts !== "Timeslot0" || (!agentNames.includes(d) && !keyNames.includes(d))) {
             // store the information in our learnedInformation object
-            learnedInformation[ts][a].push(d);
+            learnedInformation[ts][s].push(d);
         }
     });
 
     // grab the generated_times data from the forge spec
-    const generated = agent.generated_times.tuples().map(tuple => tuple.atoms());
+    const generated = strand.agent.generated_times.tuples().map(tuple => tuple.atoms());
 
     generated.map((info) => {
         // unpack the information
@@ -87,12 +87,12 @@ strands.forEach((agent) => {
             generatedInformation[ts] = {};
         }
 
-        if (!generatedInformation[ts][a]) {
-            generatedInformation[ts][a] = [];
+        if (!generatedInformation[ts][s]) {
+            generatedInformation[ts][s] = [];
         }
 
         // store the information in our generatedInformation object
-        generatedInformation[ts][a].push(d);
+        generatedInformation[ts][s].push(d);
 
     })
 });
@@ -100,14 +100,14 @@ strands.forEach((agent) => {
 // populating the visibleInformation object (initializing everything with false)
 timeslots.forEach((timeslot) => {
     const ts = timeslot.toString();
-    strands.forEach((agent) => {
-        const a = agent.toString();
+    strands.forEach((strand) => {
+        const s = strand.toString();
 
         if (!visibleInformation[ts]) {
             visibleInformation[ts] = {};
         }
 
-        visibleInformation[ts][a] = false;
+        visibleInformation[ts][s] = false;
     });
 });
 
@@ -344,13 +344,15 @@ function filterComplexData(textArray) {
 //// helper function to find the last space before the given index in the given string
 function spaceBefore(string, index) {
 
+    console.log(string, index);
+
     let workingString = string;
     let spaceIndex = -1;
     let done = false;
     
     while(!done) {
         let i = workingString.indexOf(" ");
-        if (i !== 0 && i <= index) {
+        if (i !== 0 && i !== -1 && i <= index) {
             spaceIndex = i;
             // replace the first space with an X
             workingString = workingString.slice(0, i) + "X" + workingString.slice(i + 1);
