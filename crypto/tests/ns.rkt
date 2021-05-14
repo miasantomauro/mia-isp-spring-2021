@@ -41,21 +41,28 @@
 ; Confirm
 ;(hash-keys (forge:State-sigs forge:curr-state))
 ;(hash-keys (forge:State-relations forge:curr-state))
-(hash-keys (forge:State-pred-map forge:curr-state))
+;(hash-keys (forge:State-pred-map forge:curr-state))
 ;(relation-typelist ns_init_a)
 ;(relation-typelist skeleton_ns_0_n1)
 
 
-;(set-option! 'verbose 5)
-;(set-option! 'solver 'MiniSatProver)
-;(set-option! 'logtranslation 2)
-;(set-option! 'coregranularity 2)
-;(set-option! 'core_minimization 'rce)
+(set-option! 'verbose 5)
+(set-option! 'solver 'MiniSatProver)
+(set-option! 'logtranslation 2)
+(set-option! 'coregranularity 2)
+(set-option! 'core_minimization 'rce)
 
 (pred attack_exists
       (in (+ (join ns_init ns_init_n1)
              (join ns_init ns_init_n2))
-          (join Attacker learned_times Timeslot)))
+           (join Attacker learned_times Timeslot)))
+
+; Proxy for concrete attack, used to debug and sanity check:
+; some message is sent encrypted with the attacker's public key
+(pred proxy_shape
+      (some ((m Message)) (in (getInv (join (join m data) encryptionKey))
+                              (join KeyPairs owners Attacker ))))              ; unsat
+                              ; (join KeyPairs owners (join ns_init agent) )))) ; sat
 
 (pred success      
       (in (+ (join ns_init ns_init_n1)
@@ -69,13 +76,52 @@
       (! (in (join ns_init ns_init_n2)             
              (join Attacker generated_times Timeslot)))
 
-      ; Stopgap: initiator believes they are a, and responder believes they are b
+      ; Initiator believes they are a, and responder believes they are b
+      ; (Note: cannot add restriction on identity of counterpart, or attack won't be produced!)
       (= (join ns_init ns_init_a) (join ns_init agent))
       (= (join ns_resp ns_resp_b) (join ns_resp agent))
       
       ; Require the secrets to be different
       (! (= (join ns_init ns_init_n1)
             (join ns_init ns_init_n2))))
+
+
+
+(test NS_sanity
+      #:preds [
+               exec_ns_init
+               exec_ns_resp
+               constrain_skeleton_ns_0
+               constrain_skeleton_ns_1
+               temporary
+               wellformed
+                                           
+               success
+               attack_frame
+               ]
+      #:bounds [(is next linear)]
+      #:scope [(mesg 16) ; 6 + 3 + 2 + 5
+               (Key 6 6)
+               (name 3 3)
+               (KeyPairs 1 1)
+               (Timeslot 6 6) ; TODO: for opt, consider merge with Message?
+               (Message 6 6) ; not "mesg"
+               (text 2 2)
+               (Ciphertext 5 5)
+               (AttackerStrand 1 1)
+               (Attacker 1 1)
+               (ns_init 1 1)
+               (ns_resp 1 1)
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
+               (skey 0 0)
+               (akey 6 6)
+               (strand 3 3)
+               (skeleton_ns_0 1 1)
+               (skeleton_ns_1 1 1)
+               ] 
+      #:expect sat
+      )
 
 (run NS_SAT
       #:preds [
@@ -88,6 +134,7 @@
                
               ; (! attack_exists)
                attack_exists
+               ;proxy_shape
                success
                attack_frame
                ]
@@ -106,11 +153,12 @@
                (ns_resp 1 1)
                (PrivateKey 3 3)
                (PublicKey 3 3)
-               (skey 0 3)
+               (skey 0 0)
+               (akey 6 6)
                (strand 3 3)
                (skeleton_ns_0 1 1)
                (skeleton_ns_1 1 1)
-               ] ; omitted akey - note in case of bounds issue
+               ] 
       ;#:expect sat
       )
 
