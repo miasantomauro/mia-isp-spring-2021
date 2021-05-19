@@ -1,3 +1,6 @@
+// const terms = parseTerms(m.data.tuples());
+// const termSting = parsedTermsToString(temp, subscriptText(m));
+
 // constants for our visualization
 const baseX = 150;
 const baseY = 100;
@@ -20,9 +23,20 @@ d3.select(svg)
     .text("@import url('https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700,800');");
 
 // data from forge spec
-const timeslots = Timeslot.atoms(true);
 const strands = strand.atoms(true);
 const messages = Message.atoms(true);
+const timeslots = [];
+
+const nextRange = Timeslot.next.tuples().map(x => x.toString());
+const first = Timeslot.atoms(true).filter(timeslot => !nextRange.includes(timeslot.toString()))[0];
+
+// putting the timeslots in order
+let i;
+let curr = first;
+for (i = 0; i < Timeslot.atoms(true).length; i++) {
+    timeslots.push(curr);
+    curr = curr.next;   
+}
 
 // map from role -> name
 const roles = {}
@@ -135,6 +149,41 @@ KeyPairs0.pairs.tuples().forEach(x => {
     pubKeyMap[public] = owner;
 });
 
+const ltksMap = {};
+KeyPairs0.ltks.tuples().forEach(x => {
+    let s = x.toString();
+    let arr = s.split(", ");
+    let key = arr[2];
+    let val = arr[0] + " " + arr[1];
+    ltksMap[key] = val;
+})
+
+const ciphertextMap = {};
+plaintext.tuples().forEach((tuple) => {
+    let atoms = tuple.atoms();
+    let key = atoms[0].toString();
+    let val = atoms[1];
+
+    if (!ciphertextMap[key]) {
+        ciphertextMap[key] = [];
+    }
+
+    ciphertextMap[key].push(val);
+
+    
+});
+
+const cipherKeyMap = {};
+encryptionKey.tuples().forEach((tuple) => {
+    let atoms = tuple.atoms();
+    let key = atoms[0].toString();
+    let val = atoms[1].toString();
+
+    // TODO: just do the lookup here!!!!!!! :^)
+    cipherKeyMap[key] = val;
+});
+
+
 /**
  * gets the names of the timeslots before the given one
  * @param {*} timeslot - a Timeslot prop from the forge spec
@@ -238,19 +287,100 @@ function labelY() {
     return parseInt(l.attr('y1')) - 20;
 }
 
+function parsedTermsToString(parsedTerms, key) {
+
+    let s = "{ "
+
+    let i;
+    for (i = 0; i < parsedTerms.length; i++) {
+
+        let term = parsedTerms[i];
+
+        if (term["subscript"]) {
+            s += parsedTermsToString(term.content, term.subscript);
+        } else {
+            s += term.content; 
+        }
+
+        s += " "
+    }
+
+    s += `}[${key}]`
+
+    return s;
+}
+
+// TODO: maybe return the objects for the simpler cases
+function parseTerms(items) {
+
+    const newItems = items.map((item) => {
+
+        const itemString = item.toString();
+
+        if (pubKeyMap[itemString]) {
+            const s = `pubK${pubKeyMap[itemString]}`;
+            return {
+                content: s
+            };
+        } else if (itemString.includes("Ciphertext")) {
+            const pt = ciphertextMap[itemString];
+            const key = cipherKeyMap[itemString]; // in progress see TODO above
+            return {
+                content: parseTerms(pt),
+                subscript: key
+            }
+        } else {
+            return {
+                content: itemString
+            };
+        }
+    });
+
+    return newItems;
+}
+
+function printParsedTerms(parsedTerms, key, container, x, y) {
+
+    let i;
+    for (i = 0; i < parsedTerms.length; i++) {
+
+        let term = parsedTerms[i];
+
+        if (term["subscript"]) {
+
+        } else {
+
+        }
+
+        /*
+        const temp = container.append('text')
+            .attr('x', x)
+            .attr('y', y + h)
+            .style('font-family', '"Open Sans", sans-serif')
+            .style('fill', color)
+            .text(t);
+
+        temp.append('tspan')
+            .text(subscript)
+            .style('font-size', 12)
+            .attr('dx', 5)
+            .attr('dy', 5);
+*/
+    }
+}
+
 /**
  * a function to construct the text of a label based on the given message
  * @param {*} m - a message prop from the forge spec 
  * @returns a string containing the text for the label
  */
 function labelText(m) {
+
     const pt = [];
     // grabbing the plaintext for this message's data
     m.data.tuples().forEach(tuple => {
-        console.log(tuple.atoms()[0].toString());
 
         let datum = tuple.atoms()[0].plaintext.toString();
-        console.log(tuple.toString(), datum)
 
         if (pubKeyMap[datum]) {
             pt.push(`pubK${pubKeyMap[datum]}`);
@@ -273,9 +403,17 @@ function labelText(m) {
  * @returns a string containing the text for the subscript
  */
 function subscriptText(m) {
-    let pubKey = m.data.encryptionKey.toString();
-    let owner = pubKeyMap[pubKey];
-    return `pubK${owner}`;
+    let k = m.data.encryptionKey.toString();
+    let s;
+    if (ltksMap[k]) {
+        s = `ltk(${ltksMap[k]})`;
+    } else if (pubKeyMap[k]) {
+        s = `pubK${pubKeyMap[k]}`;
+    } else {
+        s = `${k}?`;
+    }
+    
+    return s;
 }
 
 /**
@@ -349,8 +487,6 @@ function filterComplexData(textArray) {
 
 //// helper function to find the last space before the given index in the given string
 function spaceBefore(string, index) {
-
-    console.log(string, index);
 
     let workingString = string;
     let spaceIndex = -1;
