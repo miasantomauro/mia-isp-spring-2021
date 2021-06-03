@@ -35,19 +35,19 @@
 ; being compromised, but not the initiator's. Right now, our model
 ; will create a constraint for both listeners (conjuctively), yielding
 ; a spurious unsat result unless the initiator's deflistener is removed.
-;(defskeleton blanchet
-;  (vars (a b akey) (s skey) (d data))
-;  (defstrand init 2 (a a) (b b) (s s) (d d))
-;  (deflistener d)
-;  (non-orig (invk b))
-;  (comment "From the initiator's perspective, is the secret leaked?"))
-
 (defskeleton blanchet
   (vars (a b akey) (s skey) (d data))
-  (defstrand resp 2 (a a) (b b) (s s) (d d))
+  (defstrand init 2 (a a) (b b) (s s) (d d))
   (deflistener d)
-  (non-orig (invk a) (invk b))
-  (comment "From the responders's perspective, is the secret leaked?"))
+  (non-orig (invk b))
+  (comment "From the initiator's perspective, is the secret leaked?"))
+
+;(defskeleton blanchet
+;  (vars (a b akey) (s skey) (d data))
+;  (defstrand resp 2 (a a) (b b) (s s) (d d))
+;  (deflistener d)
+;  (non-orig (invk a) (invk b))
+;  (comment "From the responders's perspective, is the secret leaked?"))
 
 ; Bounds can be quite troublesome. Count carefully.
 ; 
@@ -57,8 +57,7 @@
                exec_blanchet_resp
                constrain_skeleton_blanchet_0
                constrain_skeleton_blanchet_1
-               constrain_skeleton_blanchet_2
-               ; constrain_skeleton_blanchet_3 ; note this is the fourth skeleton if including commented out
+               constrain_skeleton_blanchet_2               
                temporary
                wellformed
 

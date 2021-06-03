@@ -24,7 +24,7 @@ d3.select(svg)
 
 // data from forge spec
 const strands = strand.atoms(true);
-const messages = Message.atoms(true);
+const messages = Timeslot.atoms(true);
 const timeslots = [];
 
 const nextRange = Timeslot.next.tuples().map(x => x.toString());
@@ -253,7 +253,7 @@ function messageX2(m) {
  * @param {Object} m - a message prop from the forge spec
  */
 function messageY1(m) {
-    return y(m.sendTime); // TODO
+    return y(m); // TODO
 }
 
 /**
@@ -262,7 +262,7 @@ function messageY1(m) {
  * @param {Object} m - a message prop from the forge spec
  */
 function messageY2(m) {
-    return y(m.sendTime); // Y1 and Y2 are sendTime because of model change 
+    return y(m); // Y1 and Y2 are sendTime because of model change 
 }
 
 /**
