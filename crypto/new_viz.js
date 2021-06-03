@@ -1,51 +1,56 @@
-// const terms = parseTerms(m.data.tuples());
-// const termSting = parsedTermsToString(temp, subscriptText(m));
 
 // constants for our visualization
-const baseX = 150;
-const baseY = 100;
-const timeslotHeight = 80;
-const agentWidth = 300;
-let boxHeight = 130;
-const boxWidth = 200;
+const BASE_X = 150;
+const BASE_Y = 100;
+const TIMESLOT_HEIGHT = 80;
+const AGENT_WIDTH = 300;
+const BOX_HEIGHT = 130;
+const BOX_WIDTH = 200;
 const LINE_HEIGHT = 20;
+
+// colors
 const RED = '#E54B4B';
 const BLUE = '#0495C2';
 const GREEN = '#19EB0E';
 const BLACK = '#000000';
 
-// add defs to allow for custom fonts!
-// ref: (https://stackoverflow.com/questions/21025876/using-google-fonts-with-d3-js-and-svg)
+// allows for custom fonts
 d3.select(svg)
     .append('defs')
     .append('style')
     .attr('type', 'text/css')
     .text("@import url('https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700,800');");
 
+/**
+ * A function to grab the timeslot data from the forge spec and 
+ * store these timeslots in order.
+ * @param {*} arr the array to populate with the ordered timeslots
+ */
+function orderTimeslots(arr) {
+    // grabbing the data from the forge spec
+    const nextRange = Timeslot.next.tuples().map(x => x.toString());
+    const first = Timeslot.atoms(true).filter(timeslot => !nextRange.includes(timeslot.toString()))[0];
+    // putting the timeslots in order
+    let i;
+    let curr = first;
+    for (i = 0; i < Timeslot.atoms(true).length; i++) {
+        arr.push(curr);
+        curr = curr.next;   
+    }
+}
+
 // data from forge spec
 const strands = strand.atoms(true);
 const messages = Message.atoms(true);
+const agentNames = strands.map(x => x.toString());
+const keyNames = Key.atoms(true).map(x => x.toString());
 const timeslots = [];
 
-const nextRange = Timeslot.next.tuples().map(x => x.toString());
-const first = Timeslot.atoms(true).filter(timeslot => !nextRange.includes(timeslot.toString()))[0];
-
-// putting the timeslots in order
-let i;
-let curr = first;
-for (i = 0; i < Timeslot.atoms(true).length; i++) {
-    timeslots.push(curr);
-    curr = curr.next;   
-}
+// populating the timeslots array
+orderTimeslots(timeslots);
 
 // map from role -> name
 const roles = {}
-agent.tuples().forEach(x => {
-    let role = x.atoms()[0].toString();
-    let name = x.atoms()[1].toString();
-    roles[role] = name;
-});
-
 // map from Timeslot -> Agent -> [Data]
 const learnedInformation = {};
 // map from Timeslot -> Agent -> [Data]
@@ -58,11 +63,18 @@ const dataMessageMap = {};
 const pubKeyMap = {};
 // map from private key (Datum) -> owner (Agent)
 const privKeyMap = {};
+const ltksMap = {};
+const ciphertextMap = {};
+const cipherKeyMap = {};
 
-const agentNames = strands.map(x => x.toString());
-const keyNames = Key.atoms(true).map(x => x.toString());
+// populating the roles object
+agent.tuples().forEach(x => {
+    let role = x.atoms()[0].toString();
+    let name = x.atoms()[1].toString();
+    roles[role] = name;
+});
 
-// populating the learnedInformation object
+// populating the learnedInformation and generatedInformation objects
 strands.forEach((strand) => {
 
     let s = strand.toString();
@@ -149,7 +161,7 @@ KeyPairs0.pairs.tuples().forEach(x => {
     pubKeyMap[public] = owner;
 });
 
-const ltksMap = {};
+// populating the ltksMap object
 KeyPairs0.ltks.tuples().forEach(x => {
     let s = x.toString();
     let arr = s.split(", ");
@@ -158,7 +170,7 @@ KeyPairs0.ltks.tuples().forEach(x => {
     ltksMap[key] = val;
 })
 
-const ciphertextMap = {};
+// populating the ciphertextMap object
 plaintext.tuples().forEach((tuple) => {
     let atoms = tuple.atoms();
     let key = atoms[0].toString();
@@ -168,12 +180,10 @@ plaintext.tuples().forEach((tuple) => {
         ciphertextMap[key] = [];
     }
 
-    ciphertextMap[key].push(val);
-
-    
+    ciphertextMap[key].push(val);  
 });
 
-const cipherKeyMap = {};
+// populating the cipherKeyMap object
 encryptionKey.tuples().forEach((tuple) => {
     let atoms = tuple.atoms();
     let key = atoms[0].toString();
@@ -199,7 +209,7 @@ function getTimeSlotsBefore(timeslot) {
  * @param {Object} agent - an agent prop from the forge spec
  */
 function x(agent) {
-    return baseX + (agentNames.indexOf(agent.toString()) * agentWidth);
+    return BASE_X + (agentNames.indexOf(agent.toString()) * AGENT_WIDTH);
 }
 
 /**
@@ -226,7 +236,7 @@ function y(timeslot) {
         }
     });
  
-    return baseY + (timeslots.indexOf(timeslot) * timeslotHeight) + (visibleNum * boxHeight);
+    return BASE_Y + (timeslots.indexOf(timeslot) * TIMESLOT_HEIGHT) + (visibleNum * BOX_HEIGHT);
 }
 
 /**
@@ -234,7 +244,7 @@ function y(timeslot) {
  * This corresponds with the x coordinate of the message SENDER.
  * @param {Object} m - a message prop from the forge spec
  */
- function messageX1(m) {
+function messageX1(m) {
     return x(m.sender);
 }
 
@@ -253,7 +263,7 @@ function messageX2(m) {
  * @param {Object} m - a message prop from the forge spec
  */
 function messageY1(m) {
-    return y(m.sendTime); // TODO
+    return y(m.sendTime);
 }
 
 /**
@@ -339,6 +349,7 @@ function parseTerms(items) {
     return newItems;
 }
 
+// NOT in use yet
 function printParsedTerms(parsedTerms, key, container, x, y) {
 
     let i;
@@ -375,26 +386,9 @@ function printParsedTerms(parsedTerms, key, container, x, y) {
  * @returns a string containing the text for the label
  */
 function labelText(m) {
-
-    const pt = [];
-    // grabbing the plaintext for this message's data
-    m.data.tuples().forEach(tuple => {
-
-        let datum = tuple.atoms()[0].plaintext.toString();
-
-        if (pubKeyMap[datum]) {
-            pt.push(`pubK${pubKeyMap[datum]}`);
-        } else if (privKeyMap[datum]) {
-            // TODO: would this ever happen?
-            pt.push(`privK${privKeyMap[datum]}`);
-        } else {
-            // funky
-            pt.push(datum ? datum : tuple.toString());
-        }
-    });
-    // TODO: more formatting (commas) ?
-    const ptString = pt;
-    return `{${ptString}}`;
+    const data = m.data.tuples().map(x => x.toString());
+    const parsed = parseTerms(data);
+    return parsedTermsToString(parsed[0].content, parsed[0].subscript);
 }
 
 /**
@@ -429,6 +423,11 @@ function centerText() {
     return x - (textWidth / 2);
 }
 
+/**
+ * a function to toggle the visibility of boxes upon mouseclicks
+ * @param {*} mouseevent - not used
+ * @param {*} timeslot - the timeslot to toggle visible information for
+ */
 function onMouseClick(mouseevent, timeslot) {
     const ts = timeslot.toString();
 
@@ -441,43 +440,22 @@ function onMouseClick(mouseevent, timeslot) {
     render();
 }
 
-// check if its an encripted message, public key, or private key
-function replaceDatum(d) {
-    if (dataMessageMap[d]) {
-        let m = dataMessageMap[d];
-        return {
-            content: labelText(m),
-            subscript: subscriptText(m)
-        };
-    } else if (pubKeyMap[d]) {
-        return {
-            content: `pubK${pubKeyMap[d]}`
-        };
-    } else if (privKeyMap[d]) {
-        // TODO: would this ever happen?
-        return {
-            content: `privK${privKeyMap[d]}`
-        };
-    } else {
-        return {
-            content: d
-        };
-    }
-}
-
+/**
+ * a function to seperate "complex" data (data using subscripts) from "simple" data
+ * @param {*} textArray 
+ * @returns 
+ */
 function filterComplexData(textArray) {
 
     const simple = [];
     const complex = [];
 
-    textArray.forEach((d) => {
+    parseTerms(textArray).forEach((term) => {
 
-        let replaced = replaceDatum(d);
-
-        if ('subscript' in replaced) {
-            complex.push(replaced);
+        if ('subscript' in term) {
+            complex.push(term);
         } else {
-            simple.push(replaced.content);
+            simple.push(term.content);
         }
 
     });
@@ -485,7 +463,13 @@ function filterComplexData(textArray) {
     return {simple, complex};
 }
 
-//// helper function to find the last space before the given index in the given string
+/**
+ * a helper function for wrapText which finds the last space before the given index in the 
+ * given string
+ * @param {*} string 
+ * @param {*} index 
+ * @returns 
+ */
 function spaceBefore(string, index) {
 
     let workingString = string;
@@ -506,6 +490,16 @@ function spaceBefore(string, index) {
     return spaceIndex;
 }
 
+/**
+ * a function to display text over multiple lines
+ * @param {*} container 
+ * @param {*} text 
+ * @param {*} width 
+ * @param {*} x 
+ * @param {*} y 
+ * @param {*} color 
+ * @returns the computed height of the resulting text
+ */
 function wrapText(container, text, width, x, y, color) {
 
     if (text === "") {
@@ -552,6 +546,15 @@ function wrapText(container, text, width, x, y, color) {
   
 }
 
+/**
+ * a function to render the information that appears inside the toggleable boxes
+ * @param {*} container 
+ * @param {*} info 
+ * @param {*} x 
+ * @param {*} y 
+ * @param {*} color 
+ * @returns 
+ */
 function displayInfo(container, info, x, y, color) {
 
     let h = 0;
@@ -559,10 +562,22 @@ function displayInfo(container, info, x, y, color) {
     const {simple, complex} = filterComplexData(info);
     const s = simple.join(" ");
 
-    h += wrapText(container, s, boxWidth - 25, x, y, color);
+    // render simple data over multiple lines
+    h += wrapText(container, s, BOX_WIDTH - 25, x, y, color);
 
+    // render complex data one per line
     let i;
     for (i = 0; i < complex.length; i++) {
+
+        let tempString = parsedTermsToString(complex[i].content, complex[i].subscript);
+
+        const temp = container.append('text')
+            .attr('x', x)
+            .attr('y', y + h)
+            .style('font-family', '"Open Sans", sans-serif')
+            .style('fill', color)
+            .text(tempString);
+        /*
 
         let t = complex[i].content;
 
@@ -580,6 +595,7 @@ function displayInfo(container, info, x, y, color) {
             .style('font-size', 12)
             .attr('dx', 5)
             .attr('dy', 5);
+            */
 
         h+=LINE_HEIGHT;
     }
@@ -587,6 +603,9 @@ function displayInfo(container, info, x, y, color) {
     return h;
 }
 
+/**
+ * the main render function of this visualization
+ */
 function render() {
     // clear the svg
     d3.select(svg).selectAll('*').remove();
@@ -596,9 +615,9 @@ function render() {
         .selectAll('timeslot') // giving these shapes a name
         .data(timeslots)
         .join('line')
-        .attr('x1', baseX)
+        .attr('x1', BASE_X)
         .attr('y1', y)
-        .attr('x2', baseX + ((strands.length - 1) * agentWidth))
+        .attr('x2', BASE_X + ((strands.length - 1) * AGENT_WIDTH))
         .attr('y2', y)
         .attr('stroke', BLACK)
         .attr('fill', 'white')
@@ -610,7 +629,7 @@ function render() {
         .data(timeslots)
         .join('text')
         .on('click', onMouseClick)
-        .attr('x', baseX - 90)
+        .attr('x', BASE_X - 90)
         .attr('y', y)
         .style('font-family', '"Open Sans", sans-serif')
         .style('cursor', 'pointer')
@@ -624,7 +643,7 @@ function render() {
         .attr('stroke', BLUE)
         .style('stroke-width', 10)
         .attr('x1', x)
-        .attr('y1', baseY) 
+        .attr('y1', BASE_Y) 
         .attr('x2', x)
         .attr('y2', y(timeslots[timeslots.length - 1]));
 
@@ -634,23 +653,12 @@ function render() {
         .data(strands)
         .join('text')
         .attr('x', x)
-        .attr('y', baseY - 40)
+        .attr('y', BASE_Y - 40)
         .style('font-family', '"Open Sans", sans-serif')
         .text((a) => {
             return `${a.toString()} (${roles[a.toString()]})`;
         });
 
-        /*
-    // label the strands with their roles
-    const aLabel2 = d3.select(svg)
-        .selectAll('agentLabel')
-        .data(strands)
-        .join('text')
-        .attr('x', x)
-        .attr('y', baseY - 60)
-        .style('font-family', '"Open Sans", sans-serif')
-        .text((a) => roles[a.toString()]);
-*/
     // bind messages to m
     const m = d3.select(svg)
         .selectAll('message')
@@ -701,12 +709,16 @@ function render() {
         .style('fill', BLACK)
         .text(labelText);
 
+    /*
+
     // subscript for hovering label
     label.append('tspan')
         .text(subscriptText)
         .style('font-size', 12)
         .attr('dx', 5)
         .attr('dy', 5);
+
+    */
 
     // center the text over the arrow
     label.attr('x', centerText);
@@ -717,7 +729,7 @@ function render() {
             let a = agent.toString();
             if (visibleInformation[ts][a]) {
 
-                const boxX = x(agent) - (boxWidth / 2.0);
+                const boxX = x(agent) - (BOX_WIDTH / 2.0);
                 const boxY = y(timeslot) + 30;
 
                 // create a group and give it an id specific to this timeslot-agent pair
@@ -729,8 +741,8 @@ function render() {
                 const r = g.append('rect')
                     .attr('x', boxX)
                     .attr('y', boxY)
-                    .attr('width', boxWidth)
-                    .attr('height', boxHeight)
+                    .attr('width', BOX_WIDTH)
+                    .attr('height', BOX_HEIGHT)
                     .attr('rx', 6)
                     .attr('ry', 6)
                     .style('fill', 'white')
