@@ -152,6 +152,8 @@ KeyPairs0.owners.tuples().forEach(x => {
     privKeyMap[key] = owner;
 });
 
+console.log(privKeyMap);
+
 // populating pubKeyMap
 KeyPairs0.pairs.tuples().forEach(x => {
     let atoms = x.atoms();
@@ -299,7 +301,7 @@ function labelY() {
 
 function parsedTermsToString(parsedTerms, key) {
 
-    let s = "{ "
+    let s = (key === "") ? "" : "{ ";
 
     let i;
     for (i = 0; i < parsedTerms.length; i++) {
@@ -315,7 +317,9 @@ function parsedTermsToString(parsedTerms, key) {
         s += " "
     }
 
-    s += `}[${key}]`
+    if (key !== "") {
+        s += `}[${key}]`
+    }
 
     return s;
 }
@@ -332,12 +336,24 @@ function parseTerms(items) {
             return {
                 content: s
             };
+        } else if (privKeyMap[itemString]) {
+            const s = `privK${privKeyMap[itemString]}`;
+            return {
+                content: s
+            };
+        } else if (ltksMap[itemString]) {
+            const s = `ltk(${ltksMap[itemString]})`;
+            return {
+                content: s
+            };
         } else if (itemString.includes("Ciphertext")) {
             const pt = ciphertextMap[itemString];
             const key = cipherKeyMap[itemString]; // in progress see TODO above
+            const parsedKey = parseTerms([key])[0].content;
+
             return {
                 content: parseTerms(pt),
-                subscript: key
+                subscript: parsedKey
             }
         } else {
             return {
@@ -388,26 +404,7 @@ function printParsedTerms(parsedTerms, key, container, x, y) {
 function labelText(m) {
     const data = m.data.tuples().map(x => x.toString());
     const parsed = parseTerms(data);
-    return parsedTermsToString(parsed[0].content, parsed[0].subscript);
-}
-
-/**
- * a function to construct the subscript text of a label
- * @param {*} m - a message prop from the forge spec 
- * @returns a string containing the text for the subscript
- */
-function subscriptText(m) {
-    let k = m.data.encryptionKey.toString();
-    let s;
-    if (ltksMap[k]) {
-        s = `ltk(${ltksMap[k]})`;
-    } else if (pubKeyMap[k]) {
-        s = `pubK${pubKeyMap[k]}`;
-    } else {
-        s = `${k}?`;
-    }
-    
-    return s;
+    return parsedTermsToString(parsed, "");
 }
 
 /**
