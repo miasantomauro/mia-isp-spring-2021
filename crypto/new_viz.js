@@ -349,7 +349,6 @@ function parseKey(itemString, prefix, map) {
     }
 }
 
-// TODO: maybe return the objects for the simpler cases
 function parseTerms(items) {
 
     const newItems = items.map((item) => {
@@ -365,7 +364,7 @@ function parseTerms(items) {
         } else if (itemString.includes("Ciphertext")) {
             const pt = ciphertextMap[itemString];
             const key = cipherKeyMap[itemString]; // in progress see TODO above
-            const parsedKey = parseTerms([key])[0].content;
+            const parsedKey = parseTerms([key])[0];
 
             return {
                 content: parseTerms(pt),
@@ -391,16 +390,16 @@ function flattenParsedTerms(parsedTerms) {
             array.push({content: "{"});
             array = array.concat(flattenParsedTerms(term.content));
             array.push({content: "}"});
-
+            
             if (term.subscript["shared"]) {
                 array.push({
-                    content: term.content,
-                    shared: term.shared,
+                    content: term.subscript.content,
+                    shared: term.subscript.shared,
                     subscript: "subscript"
                 });
             } else {
                 array.push({
-                    content: term.subscript,
+                    content: term.subscript.content,
                     subscript: "subscript"
                 });
             }
@@ -418,34 +417,50 @@ function flattenParsedTerms(parsedTerms) {
     return array;
 }
 
+function onSharedMouseEnter(x, y, owners) {
+    d3.select(svg).append('text')
+        .attr("x", x)
+        .attr("y", y - 15)
+        .attr("class", "sharedLabel")
+        .text(owners);  
+}
+
+function onSharedMouseLeave() {
+    d3.selectAll(".sharedLabel").remove();
+    // just delete all w the appropriate calss  
+}
+
 // should probably return a width
-function printFlattenedTerms(terms, container, x, y, color) {
+function printFlattenedTerms(terms, container, x, y, color, shouldPrint) {
 
     let i;
     let w = 0;
     for (i = 0; i < terms.length; i++) {
 
         let term = terms[i];
+        let newText;
 
         if (term["subscript"] && term["shared"]) {
-            // TODO: hover
-            const newText = container.append('text')
-                .text(term.content)
+            newText = container.append('text')
                 .style('font-size', 12)
                 .attr('x', x + w)
                 .attr('y', y)
-                .attr('dx', 5) // width?
+                .attr('dx', 5)
                 .attr('dy', 5)
-                .style('fill', color);
+                .style('fill', color)
+                .text(term.content)
+                .on('mouseenter', () => onSharedMouseEnter(x, y, term.shared))
+                .on('mouseleave', onSharedMouseLeave)
+                .style('cursor', 'pointer');
             
             w += newText.node().getComputedTextLength() + 5;
         } else if (term["subscript"]) {
-            const newText = container.append('text')
+            newText = container.append('text')
                 .text(term.content)
                 .style('font-size', 12)
                 .attr('x', x + w)
                 .attr('y', y)
-                .attr('dx', 5) // width?
+                .attr('dx', 5)
                 .attr('dy', 5)
                 .style('fill', color);
             
@@ -453,16 +468,19 @@ function printFlattenedTerms(terms, container, x, y, color) {
 
         } else if (term["shared"]) {
             // TODO: hover
-            const newText = container.append('text')
+            newText = container.append('text')
                 .attr('x', x + w)
                 .attr('y', y)
                 .style('font-family', '"Open Sans", sans-serif')
                 .style('fill', color)
-                .text(term.content);
+                .text(term.content)
+                .on('mouseenter', () => onSharedMouseEnter(x, y, term.shared))
+                .on('mouseleave', onSharedMouseLeave)
+                .style('cursor', 'pointer');
             
             w += newText.node().getComputedTextLength();
         } else {
-            const newText = container.append('text')
+            newText = container.append('text')
                 .attr('x', x + w)
                 .attr('y', y)
                 .style('font-family', '"Open Sans", sans-serif')
@@ -470,6 +488,10 @@ function printFlattenedTerms(terms, container, x, y, color) {
                 .text(term.content);
             
             w += newText.node().getComputedTextLength();
+        }
+
+        if (!shouldPrint) {
+            newText.remove();
         }
 
         /*
@@ -657,25 +679,11 @@ function displayInfo(container, info, x, y, color) {
     // render simple data over multiple lines
     h += wrapText(container, s, BOX_WIDTH - 25, x, y, color);
 
-    // TODO: call new function
-
     // render complex data one per line
     let i;
     for (i = 0; i < complex.length; i++) {
         const flattened = flattenParsedTerms([complex[i]]);
-        const w = printFlattenedTerms(flattened, container, x, y + h, color);
-        
-
-        /*
-        let tempString = parsedTermsToString(complex[i].content, complex[i].subscript);
-
-        const temp = container.append('text')
-            .attr('x', x)
-            .attr('y', y + h)
-            .style('font-family', '"Open Sans", sans-serif')
-            .style('fill', color)
-            .text(tempString);
-            */
+        const w = printFlattenedTerms(flattened, container, x, y + h, color, true);
 
         h+=LINE_HEIGHT;
 
@@ -734,11 +742,18 @@ function render() {
         .data(strands)
         .join('text')
         .attr('x', x)
+        .attr('y', BASE_Y - 60)
+        .style('font-family', '"Open Sans", sans-serif')
+        .text(a => a.toString());
+
+    const aLabel2 = d3.select(svg)
+        .selectAll('agentLabel')
+        .data(strands)
+        .join('text')
+        .attr('x', x)
         .attr('y', BASE_Y - 40)
         .style('font-family', '"Open Sans", sans-serif')
-        .text((a) => {
-            return `${a.toString()} (${roles[a.toString()]})`;
-        });
+        .text((a) => `(agent: ${roles[a.toString()]})`);
 
     // bind messages to m
     const m = d3.select(svg)
@@ -784,27 +799,21 @@ function render() {
 
     // for each message...
 
-    // adding labels
-    const label = g.append('text')
-        .attr('x', labelX) // this is temporary
-        .attr('y', labelY)
-        .style('font-family', '"Open Sans", sans-serif')
-        .style('fill', BLACK)
-        .text(labelText);
+    messages.forEach(m => {
+        let labelX = (x(m.sender) + x(m.receiver)) / 2;
+        let labelY = y(m) - 20;
 
-    /*
+        const data = m.data.tuples().map(x => x.toString());
+        const parsed = parseTerms(data);
+        const flattened = flattenParsedTerms(parsed);
 
-    // subscript for hovering label
-    label.append('tspan')
-        .text(subscriptText)
-        .style('font-size', 12)
-        .attr('dx', 5)
-        .attr('dy', 5);
+        const w = printFlattenedTerms(flattened, g, labelX, labelY, BLACK, false);
 
-    */
+        const newLabelX = labelX - Math.round((w / 2)); // rounding to make less blurry?
 
-    // center the text over the arrow
-    label.attr('x', centerText);
+        printFlattenedTerms(flattened, g, newLabelX, labelY, BLACK, true);
+
+    });
 
     timeslots.forEach((timeslot) => {
         let ts = timeslot.toString();
