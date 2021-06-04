@@ -59,10 +59,11 @@ const generatedInformation = {};
 const visibleInformation = {};
 // map from Datum -> Message
 const dataMessageMap = {};
-// map from public key (Datum) -> owner (Agent)
+// map from public key (Datum) -> owner (Agent[])
 const pubKeyMap = {};
-// map from private key (Datum) -> owner (Agent)
+// map from private key (Datum) -> owner (Agent[])
 const privKeyMap = {};
+// map from Datum -> owners
 const ltksMap = {};
 const ciphertextMap = {};
 const cipherKeyMap = {};
@@ -149,18 +150,22 @@ KeyPairs0.owners.tuples().forEach(x => {
     let atoms = x.atoms();
     let key = atoms[0].toString();
     let owner = atoms[1].toString();
-    privKeyMap[key] = owner;
+    if (!privKeyMap[key]) {
+        privKeyMap[key] = [];  
+    } 
+    privKeyMap[key].push(owner);
 });
-
-console.log(privKeyMap);
 
 // populating pubKeyMap
 KeyPairs0.pairs.tuples().forEach(x => {
     let atoms = x.atoms();
     let private = atoms[0].toString();
     let public = atoms[1].toString();
-    let owner = privKeyMap[private]; 
-    pubKeyMap[public] = owner;
+    let owners = privKeyMap[private]; 
+    if (!pubKeyMap[public]) {
+        pubKeyMap[public] = [];  
+    } 
+    pubKeyMap[public].push(owners);
 });
 
 // populating the ltksMap object
@@ -169,8 +174,11 @@ KeyPairs0.ltks.tuples().forEach(x => {
     let arr = s.split(", ");
     let key = arr[2];
     let val = arr[0] + " " + arr[1];
-    ltksMap[key] = val;
-})
+    if (!ltksMap[key]) {
+        ltksMap[key] = [];  
+    } 
+    ltksMap[key].push(val);
+});
 
 // populating the ciphertextMap object
 plaintext.tuples().forEach((tuple) => {
@@ -324,6 +332,23 @@ function parsedTermsToString(parsedTerms, key) {
     return s;
 }
 
+function parseKey(itemString, prefix, map) {
+    const owners = map[itemString];
+    let s;
+    
+    if (owners.length === 1) {
+        return {
+            content: `${prefix}(${owners[0]})`
+        };
+    } else {
+        return {
+            content: `${prefix}(SHARED)`,
+            shared: owners
+        };
+        
+    }
+}
+
 // TODO: maybe return the objects for the simpler cases
 function parseTerms(items) {
 
@@ -332,20 +357,11 @@ function parseTerms(items) {
         const itemString = item.toString();
 
         if (pubKeyMap[itemString]) {
-            const s = `pubK${pubKeyMap[itemString]}`;
-            return {
-                content: s
-            };
+            return parseKey(itemString, "pubK", pubKeyMap);
         } else if (privKeyMap[itemString]) {
-            const s = `privK${privKeyMap[itemString]}`;
-            return {
-                content: s
-            };
+            return parseKey(itemString, "privK", privKeyMap);
         } else if (ltksMap[itemString]) {
-            const s = `ltk(${ltksMap[itemString]})`;
-            return {
-                content: s
-            };
+            return parseKey(itemString, "ltk", ltksMap);
         } else if (itemString.includes("Ciphertext")) {
             const pt = ciphertextMap[itemString];
             const key = cipherKeyMap[itemString]; // in progress see TODO above
@@ -365,18 +381,95 @@ function parseTerms(items) {
     return newItems;
 }
 
-// NOT in use yet
-function printParsedTerms(parsedTerms, key, container, x, y) {
-
+function flattenParsedTerms(parsedTerms) {
+    let array = [];
     let i;
     for (i = 0; i < parsedTerms.length; i++) {
-
         let term = parsedTerms[i];
 
         if (term["subscript"]) {
+            array.push({content: "{"});
+            array = array.concat(flattenParsedTerms(term.content));
+            array.push({content: "}"});
 
+            if (term.subscript["shared"]) {
+                array.push({
+                    content: term.content,
+                    shared: term.shared,
+                    subscript: "subscript"
+                });
+            } else {
+                array.push({
+                    content: term.subscript,
+                    subscript: "subscript"
+                });
+            }
+
+        } else if (term["shared"]){
+            array.push({
+                content: term.content,
+                shared: term.shared
+            });
         } else {
+            array.push({content: term.content});
+        } 
+    }
 
+    return array;
+}
+
+// should probably return a width
+function printFlattenedTerms(terms, container, x, y, color) {
+
+    let i;
+    let w = 0;
+    for (i = 0; i < terms.length; i++) {
+
+        let term = terms[i];
+
+        if (term["subscript"] && term["shared"]) {
+            // TODO: hover
+            const newText = container.append('text')
+                .text(term.content)
+                .style('font-size', 12)
+                .attr('x', x + w)
+                .attr('y', y)
+                .attr('dx', 5) // width?
+                .attr('dy', 5)
+                .style('fill', color);
+            
+            w += newText.node().getComputedTextLength() + 5;
+        } else if (term["subscript"]) {
+            const newText = container.append('text')
+                .text(term.content)
+                .style('font-size', 12)
+                .attr('x', x + w)
+                .attr('y', y)
+                .attr('dx', 5) // width?
+                .attr('dy', 5)
+                .style('fill', color);
+            
+            w += newText.node().getComputedTextLength() + 5;
+
+        } else if (term["shared"]) {
+            // TODO: hover
+            const newText = container.append('text')
+                .attr('x', x + w)
+                .attr('y', y)
+                .style('font-family', '"Open Sans", sans-serif')
+                .style('fill', color)
+                .text(term.content);
+            
+            w += newText.node().getComputedTextLength();
+        } else {
+            const newText = container.append('text')
+                .attr('x', x + w)
+                .attr('y', y)
+                .style('font-family', '"Open Sans", sans-serif')
+                .style('fill', color)
+                .text(term.content);
+            
+            w += newText.node().getComputedTextLength();
         }
 
         /*
@@ -394,6 +487,8 @@ function printParsedTerms(parsedTerms, key, container, x, y) {
             .attr('dy', 5);
 */
     }
+
+    return w;
 }
 
 /**
@@ -562,10 +657,16 @@ function displayInfo(container, info, x, y, color) {
     // render simple data over multiple lines
     h += wrapText(container, s, BOX_WIDTH - 25, x, y, color);
 
+    // TODO: call new function
+
     // render complex data one per line
     let i;
     for (i = 0; i < complex.length; i++) {
+        const flattened = flattenParsedTerms([complex[i]]);
+        const w = printFlattenedTerms(flattened, container, x, y + h, color);
+        
 
+        /*
         let tempString = parsedTermsToString(complex[i].content, complex[i].subscript);
 
         const temp = container.append('text')
@@ -574,27 +675,10 @@ function displayInfo(container, info, x, y, color) {
             .style('font-family', '"Open Sans", sans-serif')
             .style('fill', color)
             .text(tempString);
-        /*
-
-        let t = complex[i].content;
-
-        let subscript = complex[i].subscript;
-
-        const temp = container.append('text')
-            .attr('x', x)
-            .attr('y', y + h)
-            .style('font-family', '"Open Sans", sans-serif')
-            .style('fill', color)
-            .text(t);
-
-        temp.append('tspan')
-            .text(subscript)
-            .style('font-size', 12)
-            .attr('dx', 5)
-            .attr('dy', 5);
             */
 
         h+=LINE_HEIGHT;
+
     }
 
     return h;
@@ -698,6 +782,8 @@ function render() {
         .attr('x2', messageX2)
         .attr('y2', arrowBottomY2);
 
+    // for each message...
+
     // adding labels
     const label = g.append('text')
         .attr('x', labelX) // this is temporary
@@ -730,9 +816,25 @@ function render() {
                 const boxY = y(timeslot) + 30;
 
                 // create a group and give it an id specific to this timeslot-agent pair
+                const id = ts + a;
                 const g = d3.select(svg)
                     .append('g')
-                    .attr('id', ts + a);
+                    .attr('id', id)
+                    .attr('x', boxX)
+                    .attr('y', boxY)
+                    .attr('width', BOX_WIDTH)
+                    .attr('height', BOX_HEIGHT);
+                /*
+                const g = d3.select(svg)
+                    .append('svg')
+                    .attr('id', id)
+                    .attr('x', boxX)
+                    .attr('y', boxY)
+                    .attr('width', BOX_WIDTH)
+                    .attr('height', BOX_HEIGHT)
+                    .attr('viewBox', `${boxX} ${boxY} ${BOX_WIDTH} ${BOX_HEIGHT}`)
+                    .style('overflow', 'scroll')
+                    .style('display', 'block');*/
             
                 // append the rect
                 const r = g.append('rect')
