@@ -2,12 +2,13 @@
 (require "../macrosketch.rkt")
 
 (set-option! 'verbose 5)
-;(set-option! 'solver 'MiniSatProver)
+(set-option! 'solver 'MiniSatProver)
 ;(set-option! 'skolem_depth 2)
 ;(set-option! 'sb 20000)
-;(set-option! 'logtranslation 1)
-;(set-option! 'coregranularity 1)
+(set-option! 'logtranslation 1)
+(set-option! 'coregranularity 1)
 ;(set-option! 'core_minimization 'hybrid)
+(set-option! 'core_minimization 'rce)
 
 
 (defprotocol or basic
@@ -78,8 +79,73 @@
 
 ;(printf "~a~n" exec_or_serv)
 
-(display OR_SAT)
+;(display OR_SAT)
 ;(is-sat? OR_SAT)
 ; This will auto-highlight if settings are correct
 ; (tree:get-value (forge:Run-result NS_SAT))
 ;(is-sat? NS_SAT)
+
+
+;;;;;;; OR: can participants be fooled into having different keys?
+; Requires 1 extra server strand (since 2 runs from server perspective)
+; Requires extra timeslots
+
+(run OR_attack
+      #:preds [
+               exec_or_init
+               exec_or_resp
+               exec_or_serv
+               constrain_skeleton_or_0               
+               temporary
+               wellformed
+
+               ; k for init and resp are different
+               ; this notation requires only a single init and resp strand
+               (not (= (join or_init or_init_k)
+                       (join or_resp or_resp_k)))
+               
+               ; This is a modeling annoyance -- Attacker is an agent, so may have keys
+               ; The attacker has no long-term keys
+               (no (+ (join Attacker (join name (join KeyPairs ltks)))
+                      (join name (join Attacker (join KeyPairs ltks)))))
+
+               ; initiator's a and b differ
+               (not (= (join or_init or_init_a)
+                       (join or_init or_init_b)))
+               
+               ]
+      #:bounds [(is next linear)]
+      #:scope [(KeyPairs 1 1)
+               ;(Timeslot 8 8) ; recv + send (recall attacker is medium)
+               (Timeslot 10 11) ; + 2 replay to new server strand, 1 send by attacker
+               
+               ;(mesg 21) ; 9 + 4 + 3 + 5
+               (mesg 23) ; +1 for the new key, +1 for new ciphertext
+               
+               (Key 10 10)
+               (akey 6 6)               
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
+               (skey 4 4)
+               
+               (name 4 4) ; attacker plus server, init, resp's agents
+               (Attacker 1 1)
+               
+               (text 3 3) ; includes data
+               
+               (Ciphertext 6 6)               
+               
+               (AttackerStrand 1 1)                              
+               (or_init 1 1)
+               (or_resp 1 1)
+               (or_serv 2 2) 
+               
+               (skeleton_or_0 1 1)              
+               (Int 5 5) 
+               ]
+;      #:expect sat
+      )
+
+;(printf "~a~n" exec_or_serv)
+
+(display OR_attack)

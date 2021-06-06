@@ -2,8 +2,8 @@
 // constants for our visualization
 const BASE_X = 150;
 const BASE_Y = 100;
-const TIMESLOT_HEIGHT = 80;
-const AGENT_WIDTH = 300;
+const TIMESLOT_HEIGHT = 60;
+const AGENT_WIDTH = 270;
 const BOX_HEIGHT = 130;
 const BOX_WIDTH = 200;
 const LINE_HEIGHT = 20;

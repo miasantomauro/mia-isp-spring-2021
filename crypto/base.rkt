@@ -180,6 +180,8 @@ pred wellformed {
 
   -- at most one long-term key per (ordered) pair of names
   all a:name, b:name | lone getLTK[a,b]
+  -- assume long-term keys are fresh
+  all k: skey | lone (KeyPairs.ltks).k
 
   -- Attacker's strand
   AttackerStrand.agent = Attacker
@@ -252,43 +254,3 @@ pred temporary {
   --all ak : akey | ak in PrivateKey + PublicKey
 
 }
-
-/*
-
-
--- 2 publickey, 3 ciphertext, 3 agent
--- Sigs that we have: Datum, Key, PrivateKey, PublicKey, SymmetricKey, Agent, Attacker, Ciphertext, Text, Message, Timeslot, KeyPairs
-
-option verbose 5
-option solver MiniSatProver
-option logtranslation 1
-option coregranularity 1
-option core_minimization hybrid
-
-run {
-  temporary
-  wellformed
-  ns_execution
-  constrain_skeletonNS_0
-  constrain_skeletonNS_1
-  exploit_search
-} for exactly 16 mesg, exactly 6 Key, 
-			exactly 2 SkeletonNS, 
-			exactly 1 SkeletonNS_0,
- 		 	exactly 1 SkeletonNS_1, 
-			exactly 3 PrivateKey, 
-			exactly 3 PublicKey, 
-			exactly 0 skey, 
-			exactly 1 Init, 
-			exactly 1 Resp,
-                        exactly 3 strand,
-			exactly 1 Attacker,
-                        exactly 1 AttackerStrand,
-			exactly 5 Ciphertext, 
-			exactly 2 text,
-			exactly 6 Message,
- 			exactly 6 Timeslot, 
-			exactly 1 KeyPairs, 
-			exactly 3 name for {next is linear}
-
-*/

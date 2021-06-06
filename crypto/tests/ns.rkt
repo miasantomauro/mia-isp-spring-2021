@@ -20,6 +20,18 @@
            (send (enc n1 n2 (pubk a)))
            (recv (enc n2 (pubk b))))))
 
+; Similarly to Blanchet, the problem is from the responder's POV:
+; there is a confusion of identity. Both (responder vals for ) a and b's
+; keys are secret: neither is the MitM. but the responder believes that
+; they are b, and the initiator has a different name for b; perhaps
+; someone compromised.
+
+; Note, vitally, this quote from the CPSA manual:
+; "Below this is a list of trees, each of which represents the analysis
+;  of one of the input defskeletons; in the case of our example, there are two trees."
+; Unfortunately, our tool doesn't break the analysis out separately per skeleton.
+
+; SKELETON 0
 (defskeleton ns
   (vars (a b name) (n1 text))
   (defstrand init 3 (a a) (b b) (n1 n1)) 
@@ -27,6 +39,7 @@
   (uniq-orig n1)
   (comment "Initiator point-of-view"))
 
+; SKELETON 1
 (defskeleton ns
   (vars (a b name) (n2 text))
   (defstrand resp 3 (a a) (b b) (n2 n2))
@@ -46,11 +59,11 @@
 ;(relation-typelist skeleton_ns_0_n1)
 
 
-(set-option! 'verbose 5)
-(set-option! 'solver 'MiniSatProver)
-(set-option! 'logtranslation 2)
-(set-option! 'coregranularity 2)
-(set-option! 'core_minimization 'rce)
+;(set-option! 'verbose 1)
+;(set-option! 'solver 'MiniSatProver)
+;(set-option! 'logtranslation 2)
+;(set-option! 'coregranularity 2)
+;(set-option! 'core_minimization 'rce)
 
 (pred attack_exists
       (in (+ (join ns_init ns_init_n1)
@@ -109,21 +122,22 @@
                (akey 6 6)
                (strand 3 3)
                (skeleton_ns_0 1 1)
-               (skeleton_ns_1 1 1)
+               ;(skeleton_ns_1 1 1)
                ] 
       #:expect sat
       )
 
-(run NS_attack
+(test NS_attack_initiator
       #:preds [
                exec_ns_init
                exec_ns_resp
-               constrain_skeleton_ns_0
-               constrain_skeleton_ns_1
+               constrain_skeleton_ns_0 ; INITIATOR POV
+               ;constrain_skeleton_ns_1
                temporary
                wellformed
-               
+
                attack_exists
+               ;(not attack_exists)
                success
                attack_frame
                ]
@@ -144,13 +158,54 @@
                (skey 0 0)
                (akey 6 6)
                (strand 3 3)
+               ; Skeletons must /exist/, but don't need to be constrained
                (skeleton_ns_0 1 1)
                (skeleton_ns_1 1 1)
                ] 
-      ;#:expect sat
+      #:expect unsat
       )
 
-(display NS_attack)
+(test NS_attack_responder
+      #:preds [
+               exec_ns_init
+               exec_ns_resp
+               ;constrain_skeleton_ns_0
+               constrain_skeleton_ns_1 ; RESPONDER POV
+               temporary
+               wellformed
+
+               attack_exists
+               ;(not attack_exists)
+               success
+               attack_frame
+               ]
+      #:bounds [(is next linear)]
+      #:scope [(mesg 16)
+               (Key 6 6)
+               (name 3 3)
+               (KeyPairs 1 1)
+               (Timeslot 6 6)
+               (text 2 2)
+               (Ciphertext 5 5)
+               (AttackerStrand 1 1)
+               (Attacker 1 1)
+               (ns_init 1 1)
+               (ns_resp 1 1)
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
+               (skey 0 0)
+               (akey 6 6)
+               (strand 3 3)
+               ; Skeletons must /exist/, but don't need to be constrained
+               (skeleton_ns_0 1 1)
+               (skeleton_ns_1 1 1)
+               ] 
+      #:expect sat
+      )
+
+
+
+;(display NS_attack_initiator)
 ; This will auto-highlight if settings are correct
 ; (tree:get-value (forge:Run-result NS_SAT))
 ;(is-sat? NS_SAT)

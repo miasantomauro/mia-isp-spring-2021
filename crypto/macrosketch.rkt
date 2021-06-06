@@ -387,7 +387,11 @@
               ; trace assertions
               #,(wrap-msg-vars
                  (reverse msg-var-decls)
-                 #`(&&                                        
+                 #`(&&
+                    ; these are *all* the send/receives for this strand
+                    (= (+ #,@(map (lambda (pr) (car (syntax->list pr))) msg-var-decls))
+                       (+ (join sender rv) (join receiver rv)))
+                    ; trace decl
                     #,@(for/list ([ev (ast-trace-events a-trace)]
                                   [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
                          (let ([msg (format-id (ast-event-origstx ev) "t~a" i)]
@@ -519,7 +523,19 @@
          (flatten
           (for/list ([ast asts])
             (for/list ([term (if ast (accessor ast) '())]) ; if no such decls are present, do nothing
-              #`(#,kind ([aStrand strand])
+              (printf "Processing orig declaration: kind=~a~n" (syntax->datum kind))
+              #`(&&
+                 ; if "non-" additional meaning to reflect CPSA: 
+                 ; this can't be a a key prepopulated for the attacker
+                 #,(if (equal? (syntax->datum kind) 'no)
+                       #`(not
+                          (in
+                           #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter)
+                           (baseKnown Attacker)))
+                       #'true)
+                 
+                 ; actual origination constraints
+                 (#,kind ([aStrand strand])
                         (||
                          (originates aStrand
                                      #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter))
@@ -528,7 +544,7 @@
                          #,(if (is-text-variable? term vars)
                                #`(generates aStrand
                                     #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter))
-                               #'false))))))])
+                               #'false)))))))])
     result))
 
 

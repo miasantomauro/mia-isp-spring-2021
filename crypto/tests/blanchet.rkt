@@ -4,6 +4,8 @@
 ;(herald "Blanchet's Simple Example Protocol"
 ;  (comment "There is a flaw in this protocol by design"))
 
+; ANALYSIS FROM RESPONDER's PERSPECTIVE ONLY
+
 (defprotocol blanchet basic
   (defrole init
     (vars (a b akey) (s skey) (d data))
@@ -19,28 +21,31 @@
     (uniq-orig d))
   (comment "Blanchet's protocol"))
 
-(defskeleton blanchet
-  (vars (a b akey) (s skey) (d data))
-  (defstrand init 2 (a a) (b b) (s s) (d d))
-  (non-orig (invk b))
-  (comment "Analyze from the initiator's perspective"))
+;(defskeleton blanchet
+;  (vars (a b akey) (s skey) (d data))
+;  (defstrand init 2 (a a) (b b) (s s) (d d))
+;  (non-orig (invk b))
+;  (comment "Analyze from the initiator's perspective"))
 
-(defskeleton blanchet
-  (vars (a b akey) (s skey) (d data))
-  (defstrand resp 2 (a a) (b b) (s s) (d d))
-  (non-orig (invk a) (invk b))
-  (comment "Analyze from the responder's perspective"))
+;(defskeleton blanchet
+;  (vars (a b akey) (s skey) (d data))
+;  (defstrand resp 2 (a a) (b b) (s s) (d d))
+;  (non-orig (invk a) (invk b))
+;  (comment "Analyze from the responder's perspective"))
 
+; Note well:
 ; The scenario the manual describes shows the *responder*'s value
 ; being compromised, but not the initiator's. Right now, our model
 ; will create a constraint for both listeners (conjuctively), yielding
 ; a spurious unsat result unless the initiator's deflistener is removed.
-;(defskeleton blanchet
-;  (vars (a b akey) (s skey) (d data))
-;  (defstrand init 2 (a a) (b b) (s s) (d d))
-;  (deflistener d)
-;  (non-orig (invk b))
-;  (comment "From the initiator's perspective, is the secret leaked?"))
+
+;  To do so, don't remove the skeleton, just prevent its constraint from taking effect.
+(defskeleton blanchet
+  (vars (a b akey) (s skey) (d data))
+  (defstrand init 2 (a a) (b b) (s s) (d d))
+  (deflistener d)
+  (non-orig (invk b))
+  (comment "From the initiator's perspective, is the secret leaked?"))
 
 (defskeleton blanchet
   (vars (a b akey) (s skey) (d data))
@@ -50,15 +55,14 @@
   (comment "From the responders's perspective, is the secret leaked?"))
 
 ; Bounds can be quite troublesome. Count carefully.
-; 
-(run blanchet_SAT
+;
+
+(run blanchet_attack_initiator
       #:preds [
                exec_blanchet_init
                exec_blanchet_resp
-               constrain_skeleton_blanchet_0
-               constrain_skeleton_blanchet_1
-               constrain_skeleton_blanchet_2
-               ; constrain_skeleton_blanchet_3 ; note this is the fourth skeleton if including commented out
+               constrain_skeleton_blanchet_0 ; initiator's POV
+               ;constrain_skeleton_blanchet_1
                temporary
                wellformed
 
@@ -69,12 +73,12 @@
                ;   - without this we get odd CEs since the model doesn't prevent matching against unopenable encs
                ;   - ideally some of this would be enforced by non-orig anyway
                (in (join blanchet_init blanchet_init_a) PublicKey)
-               (in (join blanchet_init blanchet_init_b) PublicKey)
-
+               (in (join blanchet_init blanchet_init_b) PublicKey)               
+               
                ; s is not a LTK pair (since these are auto-distributed in our model)
                ; KeyPairs.ltks: name x name x skey, hence the join pattern
-               (not (in (join blanchet_init blanchet_init_d)
-                        (join name (join name (join KeyPairs ltks)))))
+              ;; (not (in (join blanchet_init blanchet_init_d)
+               ;         (join name (join name (join KeyPairs ltks)))))
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
@@ -101,10 +105,67 @@
                
                (skeleton_blanchet_0 1 1)
                (skeleton_blanchet_1 1 1)
-               (skeleton_blanchet_2 1 1)               
+               ;(skeleton_blanchet_2 1 1)               
+               (Int 5)
+               ]
+      ;#:expect unsat
+      )
+
+(run blanchet_attack_responder
+      #:preds [
+               exec_blanchet_init
+               exec_blanchet_resp
+               ; constrain_skeleton_blanchet_0
+               constrain_skeleton_blanchet_1 ; responder's POV
+               temporary
+               wellformed
+
+               ; The attacker has no long-term keys
+               (no (+ (join Attacker (join name (join KeyPairs ltks)))
+                      (join name (join Attacker (join KeyPairs ltks)))))
+               ; initiator's a and b are public keys
+               ;   - without this we get odd CEs since the model doesn't prevent matching against unopenable encs
+               ;   - ideally some of this would be enforced by non-orig anyway
+               (in (join blanchet_init blanchet_init_a) PublicKey)
+               (in (join blanchet_init blanchet_init_b) PublicKey)               
+               
+               ; s is not a LTK pair (since these are auto-distributed in our model)
+               ; KeyPairs.ltks: name x name x skey, hence the join pattern
+              ;; (not (in (join blanchet_init blanchet_init_d)
+               ;         (join name (join name (join KeyPairs ltks)))))
+               ]
+      #:bounds [(is next linear)]
+      #:scope [(KeyPairs 1 1)
+               (Timeslot 4 4)                               
+               (mesg 20) ; 9 + 3 + 3 + 5
+               
+               (Key 8 8)
+               (akey 6 6)               
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
+               (skey 2 2) ; allow extra to see compromise
+               
+               (name 3 3)
+               (Attacker 1 1)
+               
+               (text 2 2) ; allow extra to see compromise
+               
+               (Ciphertext 5 5)               
+               
+               (AttackerStrand 1 1)               
+               (blanchet_init 1 1)
+               (blanchet_resp 1 1)               
+               (strand 3 3)
+               
+               (skeleton_blanchet_0 1 1)
+               (skeleton_blanchet_1 1 1)
+               ;(skeleton_blanchet_2 1 1)               
                (Int 5)
                ]
       ;#:expect sat
       )
 
-(display blanchet_SAT)
+
+
+(display blanchet_attack_initiator)
+(display blanchet_attack_responder)

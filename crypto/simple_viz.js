@@ -1,13 +1,13 @@
 const baseX = 150;
 const baseY = 100;
-const timeslotHeight = 80;
-const nameWidth = 300;
+const timeslotHeight = 60;
+const nameWidth = 200;
 const boxHeight = 130;
 const boxWidth = 200;
 
 const timeslots = Timeslot.atoms(true);
 const names = name.atoms(true);
-const messages = Message.atoms(true);
+const messages = Timeslot.atoms(true);
 
 const dataMessageMap = {};
 const pubKeyMap = {};
@@ -43,7 +43,7 @@ const x = name => baseX + (names.indexOf(name) * nameWidth);
 const y = timeslot => baseY + (timeslots.indexOf(timeslot) * timeslotHeight);
 const messageX1 = m => x(m.sender.agent);
 const messageX2 = m => x(m.receiver.agent);
-const messageY = m => y(m.sendTime); 
+const messageY = m => y(m); 
 
 function labelX() {
     const l = d3.select(this.parentNode).select('line');
@@ -124,7 +124,7 @@ g.append('line')            // append a line (becomes a child of g)
     .attr('y1', messageY)   // the time sent
     .attr('x2', messageX2)  // the receiver
     .attr('y2', messageY)   // the time received
-    .style('stroke-width', 10)
+    .style('stroke-width', 5)
     .attr('stroke', '#054A91');
 
 const arrowX1 = (m) => messageX1(m) > messageX2(m) ? messageX2(m) + 20 : messageX2(m) - 20;
@@ -134,7 +134,7 @@ const arrowTopY2 = (m) => messageY(m) - 3;
 const arrowBottomY2 = (m) => messageY(m) + 3;
 
 g.append('line')
-    .style('stroke-width', 10)
+    .style('stroke-width', 5)
     .attr('stroke', '#054A91')
     .attr('x1', arrowX1)
     .attr('y1', arrowTopY1)
@@ -142,7 +142,7 @@ g.append('line')
     .attr('y2', arrowTopY2);
 
 g.append('line')
-    .style('stroke-width', 10)
+    .style('stroke-width', 5)
     .attr('stroke', '#054A91')
     .attr('x1', arrowX1)
     .attr('y1', arrowBottomY1)
