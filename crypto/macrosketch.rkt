@@ -501,17 +501,22 @@
       '()))
 
 ; The AST naming convention conflates "text" (the sort) with identifiers. 
-(define-for-syntax (is-text-variable? v vars)
-  (if (ast-text? v)
-      (let* ([vdecls (map (lambda (p) (list (syntax->datum (first p))
-                                            (syntax->datum (second p))))
-                          (ast-vars-assoc-decls vars))]
-             [vsym (syntax->datum (ast-text-value v))]
-             [vdecl (assoc vsym vdecls)])         
-        (unless vdecl
-          (error (format "is-text-variable? couldn't find variable ~a in ~a" vsym vdecls)))
-        (equal? (second vdecl) 'text))
-      #f))
+(define-for-syntax (is-text-or-key-variable? v vars)
+  (cond
+    [(ast-text? v) ; N.B. this is just a variable name; misnamed
+     (let* ([vdecls (map (lambda (p) (list (syntax->datum (first p))
+                                           (syntax->datum (second p))))
+                         (ast-vars-assoc-decls vars))]
+            [vsym (syntax->datum (ast-text-value v))]
+            [vdecl (assoc vsym vdecls)])         
+       (unless vdecl
+         (error (format "is-text-or-key-variable? couldn't find variable ~a in ~a" vsym vdecls)))
+       (or (equal? (second vdecl) 'text)
+           (equal? (second vdecl) 'skey)
+           (equal? (second vdecl) 'akey)
+           (equal? (second vdecl) 'key)))]
+    [(ast-key? v) #t]
+    [else #f]))
 
 
 ; we don't need to resolve each strand's idea of who "a" is.
@@ -525,9 +530,11 @@
             (for/list ([term (if ast (accessor ast) '())]) ; if no such decls are present, do nothing
               (printf "Processing orig declaration: kind=~a~n" (syntax->datum kind))
               #`(&&
-                 ; if "non-" additional meaning to reflect CPSA: 
-                 ; this can't be a a key prepopulated for the attacker
-                 #,(if (equal? (syntax->datum kind) 'no)
+                 ; Additional meaning to reflect CPSA for uniq- and non-orig:
+                 ; this can't be a a key *prepopulated* for the attacker, since
+                 ; they are uniquely and freshly chosen
+                 #,(if (or (equal? (syntax->datum kind) 'no) ; non-
+                           (equal? (syntax->datum kind) 'one)) ; uniq-
                        #`(not
                           (in
                            #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter)
@@ -541,10 +548,12 @@
                                      #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter))
                          ; conflate origination and generation, but only when it's well-typed to do so
                          ; (generation in our model is for text only, not keys)
-                         #,(if (is-text-variable? term vars)
-                               #`(generates aStrand
-                                    #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter))
-                               #'false)))))))])
+                         #,(begin
+                             (printf "  processing orig for term=~a~n" term)
+                             (if (is-text-or-key-variable? term vars)
+                                 #`(generates aStrand
+                                              #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter))
+                                 #'false))))))))])
     result))
 
 

@@ -55,7 +55,7 @@ sig Timeslot {
 -- As names are sent messagest, they learn pieces of data --
 sig name extends mesg {
   learned_times: set mesg -> Timeslot,
-  generated_times: set text -> Timeslot
+  generated_times: set mesg -> Timeslot
 }
 
 sig strand {
@@ -111,7 +111,7 @@ pred wellformed {
     --  Note use of "previously" by subtracting the *R*TC is crucial in preventing cyclic justification.
     -- the baseKnown function includes e.g. an agent's private key, otherwise "prior knowledge" is empty (even of their private key)
     { 
-      -- TODO try?
+      
       --d not in ((a.workspace)[t])[Timeslot - microt.^next] and -- first time appearing
       {some superterm : Ciphertext | {      
       d in superterm.plaintext and     
@@ -185,6 +185,18 @@ pred wellformed {
 
   -- Attacker's strand
   AttackerStrand.agent = Attacker
+
+  -- generation only of text and keys, not complex terms
+  --  furthermore, only generate if unknown
+  all n: name | {
+      n.generated_times.Timeslot in text+Key
+      all t: Timeslot, d: mesg | {
+          d in n.generated_times.t implies {
+              all t2: t.~(^next) | { d not in n.learned_times.t2 }
+              d not in baseKnown[n]              
+          }
+      }
+  }
 }
 
 fun subterm[supers: set mesg]: set mesg {

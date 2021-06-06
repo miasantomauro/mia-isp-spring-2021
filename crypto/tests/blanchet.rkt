@@ -4,8 +4,6 @@
 ;(herald "Blanchet's Simple Example Protocol"
 ;  (comment "There is a flaw in this protocol by design"))
 
-; ANALYSIS FROM RESPONDER's PERSPECTIVE ONLY
-
 (defprotocol blanchet basic
   (defrole init
     (vars (a b akey) (s skey) (d data))
@@ -57,7 +55,7 @@
 ; Bounds can be quite troublesome. Count carefully.
 ;
 
-(run blanchet_attack_initiator
+(test blanchet_attack_initiator
       #:preds [
                exec_blanchet_init
                exec_blanchet_resp
@@ -66,19 +64,12 @@
                temporary
                wellformed
 
-               ; The attacker has no long-term keys
-               (no (+ (join Attacker (join name (join KeyPairs ltks)))
-                      (join name (join Attacker (join KeyPairs ltks)))))
                ; initiator's a and b are public keys
                ;   - without this we get odd CEs since the model doesn't prevent matching against unopenable encs
                ;   - ideally some of this would be enforced by non-orig anyway
                (in (join blanchet_init blanchet_init_a) PublicKey)
                (in (join blanchet_init blanchet_init_b) PublicKey)               
                
-               ; s is not a LTK pair (since these are auto-distributed in our model)
-               ; KeyPairs.ltks: name x name x skey, hence the join pattern
-              ;; (not (in (join blanchet_init blanchet_init_d)
-               ;         (join name (join name (join KeyPairs ltks)))))
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
@@ -104,11 +95,10 @@
                (strand 3 3)
                
                (skeleton_blanchet_0 1 1)
-               (skeleton_blanchet_1 1 1)
-               ;(skeleton_blanchet_2 1 1)               
+               (skeleton_blanchet_1 1 1)                           
                (Int 5)
                ]
-      ;#:expect unsat
+      #:expect unsat
       )
 
 (run blanchet_attack_responder
@@ -120,19 +110,18 @@
                temporary
                wellformed
 
-               ; The attacker has no long-term keys
-               (no (+ (join Attacker (join name (join KeyPairs ltks)))
-                      (join name (join Attacker (join KeyPairs ltks)))))
                ; initiator's a and b are public keys
                ;   - without this we get odd CEs since the model doesn't prevent matching against unopenable encs
                ;   - ideally some of this would be enforced by non-orig anyway
                (in (join blanchet_init blanchet_init_a) PublicKey)
                (in (join blanchet_init blanchet_init_b) PublicKey)               
                
-               ; s is not a LTK pair (since these are auto-distributed in our model)
+               ; FOR DISPLAY ONLY: dont send a LTK as d or s
                ; KeyPairs.ltks: name x name x skey, hence the join pattern
-              ;; (not (in (join blanchet_init blanchet_init_d)
-               ;         (join name (join name (join KeyPairs ltks)))))
+               (not (in (join blanchet_init blanchet_init_d)
+                        (join name (join name (join KeyPairs ltks)))))
+               (not (in (join blanchet_init blanchet_init_s)
+                        (join name (join name (join KeyPairs ltks)))))
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
@@ -159,7 +148,6 @@
                
                (skeleton_blanchet_0 1 1)
                (skeleton_blanchet_1 1 1)
-               ;(skeleton_blanchet_2 1 1)               
                (Int 5)
                ]
       ;#:expect sat
@@ -167,5 +155,5 @@
 
 
 
-(display blanchet_attack_initiator)
+;(display blanchet_attack_initiator)
 (display blanchet_attack_responder)
