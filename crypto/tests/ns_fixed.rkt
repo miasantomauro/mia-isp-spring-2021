@@ -64,12 +64,13 @@
             (join ns_init ns_init_n2))))
 
 
+; Vacuity check
 (test ns_fixed_SAT
       #:preds [
                exec_ns_init
                exec_ns_resp
                constrain_skeleton_ns_0
-               constrain_skeleton_ns_1
+               constrain_skeleton_ns_1 
                temporary
                wellformed
                (! attack_exists)
@@ -101,8 +102,8 @@
       #:preds [
                exec_ns_init
                exec_ns_resp
-               constrain_skeleton_ns_0
-               constrain_skeleton_ns_1
+               ;constrain_skeleton_ns_0
+               constrain_skeleton_ns_1 ; from responder's POV only
                temporary
                wellformed
                attack_exists
