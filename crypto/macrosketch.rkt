@@ -15,7 +15,7 @@
 
 (require syntax/parse syntax/parse/define)
 (require (for-syntax (only-in racket take last flatten drop-right first second third filter-map
-                              string-join
+                              string-join empty?
                               or/c define/contract listof [-> -->]) 
                      racket/match
                      racket/syntax))
@@ -383,20 +383,32 @@
               ; enforce that every variable is populated uniquely
               #,@(for/list ([vt (ast-vars-assoc-decls vars)])
                    (let ([v (first vt)])                     
-                     #`(one (join rv #,(id->strand-var pname rname v))))) 
+                     #`(one (join rv #,(id->strand-var pname rname v)))))
+              ; enforce that every variable is "learned" at some point
+              ; !!!             
+              #,@(for/list ([vt (ast-vars-assoc-decls vars)])
+                   (let ([v (first vt)])                     
+                     #`(in (join rv #,(id->strand-var pname rname v))
+                           (join (join (join rv agent) learned_times) Timeslot))))
+              
               ; trace assertions
               #,(wrap-msg-vars
                  (reverse msg-var-decls)
-                 #`(&&
-                    ; these are *all* the send/receives for this strand
-                    (= (+ #,@(map (lambda (pr) (car (syntax->list pr))) msg-var-decls))
-                       (+ (join sender rv) (join receiver rv)))
-                    ; trace decl
-                    #,@(for/list ([ev (ast-trace-events a-trace)]
-                                  [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
-                         (let ([msg (format-id (ast-event-origstx ev) "t~a" i)]
-                               [prev-msg (if (> i 0) (format-id (ast-event-origstx ev) "t~a"  (- i 1)) #f)])
-                           (build-event-assertion pname rname #'rv ev msg prev-msg))))))))))
+                 (if (empty? (ast-trace-events a-trace))
+                     #'true ; in case of empty trace
+                     #`(&&
+
+                        ; these are *all* the send/receives for this strand
+                        ;(= (+ #,@(map (lambda (pr) (car (syntax->list pr))) msg-var-decls))
+                        ;   (+ (join sender rv) (join receiver rv)))
+                        ; !!!
+                        
+                        ; trace decl
+                        #,@(for/list ([ev (ast-trace-events a-trace)]
+                                      [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])
+                             (let ([msg (format-id (ast-event-origstx ev) "t~a" i)]
+                                   [prev-msg (if (> i 0) (format-id (ast-event-origstx ev) "t~a"  (- i 1)) #f)])
+                               (build-event-assertion pname rname #'rv ev msg prev-msg)))))))))))
 
 (define-for-syntax (wrap-msg-vars var-decls stx)
   (if (equal? '() var-decls)
