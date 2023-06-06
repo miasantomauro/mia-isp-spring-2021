@@ -6,11 +6,13 @@
 - ns test
 - ns fixed test
 - reflect test
+  - TypeError: r is undefined (viz)
 - blanchet test
 - blanchet corrected (?) test
 - or (?) test
 - multi-data (?) test
 - documentation in this file
+- document predicates (temporary? wellformed? can we rename the former to something meaningful?)
 - fully migrate tests and docs to Forge repo
 
 

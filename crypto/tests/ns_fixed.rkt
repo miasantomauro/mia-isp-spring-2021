@@ -2,6 +2,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Needham-Schroeder example from CSPA (Fixed version)
+; See `ns.rkt` for comments and context.
 
 (defprotocol ns basic
   (defrole init

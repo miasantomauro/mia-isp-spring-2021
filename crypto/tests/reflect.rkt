@@ -1,7 +1,4 @@
-#lang forge/core
-(require "../macrosketch.rkt")
-
-;(herald reflect)
+#lang forge/domains/crypto
 
 ;; A simple protocol vulnerable to a reflection attack
 
@@ -38,16 +35,16 @@
 (test reflect_SAT
       #:preds [
                exec_reflect_init
-               exec_reflect_resp               
+               exec_reflect_resp
                constrain_skeleton_reflect_0
                constrain_skeleton_reflect_1
-               constrain_skeleton_reflect_2               
+               constrain_skeleton_reflect_2
                temporary
                wellformed
 
-               ; Enforce different principals
-               (not (= (join reflect_resp agent)
-                       (join reflect_init agent)))
+               ; Enforce different principals (recall need to use "!", not "not")
+               (! (= (join reflect_resp agent)
+                     (join reflect_init agent)))
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
@@ -85,19 +82,17 @@
       #:preds [
                exec_reflect_init
                exec_reflect_resp               
-               ;constrain_skeleton_reflect_0
-               ;constrain_skeleton_reflect_1
                constrain_skeleton_reflect_2 ; responder POV strand
                temporary
                wellformed
 
-               ; Enforce different principals
-               (not (= (join reflect_resp agent)
+               ; Enforce different principals (recall need to use "!", not "not")
+               (! (= (join reflect_resp agent)
                        (join reflect_init agent)))
                ; Enforce b and a are not from the same pair
-               (not (= (join reflect_resp reflect_resp_a)
+               (! (= (join reflect_resp reflect_resp_a)
                        (getInv (join reflect_resp reflect_resp_b))))               
-               (not (= (join reflect_resp reflect_resp_a)
+               (! (= (join reflect_resp reflect_resp_a)
                        (join reflect_resp reflect_resp_b)))
                ]
       #:bounds [(is next linear)]
