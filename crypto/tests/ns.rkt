@@ -165,7 +165,8 @@
       #:expect unsat
       )
 
-(test NS_attack_responder
+;(test NS_attack_responder
+(run NS_attack_responder
       #:preds [
                exec_ns_init
                exec_ns_resp
@@ -200,12 +201,12 @@
                (skeleton_ns_0 1 1)
                (skeleton_ns_1 1 1)
                ] 
-      #:expect sat
+      ;#:expect sat
       )
 
 
 
-;(display NS_attack_initiator)
+(display NS_attack_responder)
 ; This will auto-highlight if settings are correct
 ; (tree:get-value (forge:Run-result NS_SAT))
 ;(is-sat? NS_SAT)

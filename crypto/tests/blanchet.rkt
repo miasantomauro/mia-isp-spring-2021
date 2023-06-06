@@ -55,6 +55,55 @@
 ; Bounds can be quite troublesome. Count carefully.
 ;
 
+
+(test blanchet_SAT
+      #:preds [
+               exec_blanchet_init
+               exec_blanchet_resp
+               ;constrain_skeleton_blanchet_0
+               ;constrain_skeleton_blanchet_1
+               temporary
+               wellformed
+
+               ; initiator's a and b are public keys
+               ;   - without this we get odd CEs since the model doesn't prevent matching against unopenable encs
+               ;   - ideally some of this would be enforced by non-orig anyway
+               (in (join blanchet_init blanchet_init_a) PublicKey)
+               (in (join blanchet_init blanchet_init_b) PublicKey)               
+               
+               ]
+      #:bounds [(is next linear)]
+      #:scope [(KeyPairs 1 1)
+               (Timeslot 4 4)                               
+               (mesg 20) ; 9 + 3 + 3 + 5
+               
+               (Key 8 8)
+               (akey 6 6)               
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
+               (skey 2 2)
+               
+               (name 3 3)
+               (Attacker 1 1)
+               
+               (text 2 2) 
+               
+               (Ciphertext 5 5)               
+               
+               (AttackerStrand 1 1)               
+               (blanchet_init 1 1)
+               (blanchet_resp 1 1)               
+               (strand 3 3)
+               
+               (skeleton_blanchet_0 1 1)
+               (skeleton_blanchet_1 1 1)                           
+               (Int 5)
+               ]
+      #:expect sat
+      )
+
+
+
 (test blanchet_attack_initiator
       #:preds [
                exec_blanchet_init
@@ -118,10 +167,16 @@
                
                ; FOR DISPLAY ONLY: dont send a LTK as d or s
                ; KeyPairs.ltks: name x name x skey, hence the join pattern
-               (not (in (join blanchet_init blanchet_init_d)
-                        (join name (join name (join KeyPairs ltks)))))
-               (not (in (join blanchet_init blanchet_init_s)
-                        (join name (join name (join KeyPairs ltks)))))
+              ; (not (in (join blanchet_init blanchet_init_d)
+              ;          (join name (join name (join KeyPairs ltks)))))
+              ; (not (in (join blanchet_init blanchet_init_s)
+              ;          (join name (join name (join KeyPairs ltks)))))
+               
+               ; to get an example for SHARED, remove the above LTK restriction
+               ; and comment out the " assume long-term keys are fresh" in base.rkt
+               ; plus:
+               
+               (
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
@@ -150,10 +205,144 @@
                (skeleton_blanchet_1 1 1)
                (Int 5)
                ]
-      ;#:expect sat
+     ; #:expect sat
+      )
+
+
+(display blanchet_attack_responder)
+
+#;(run blanchet_attack_longer_init
+      #:preds [
+               exec_blanchet_init
+               exec_blanchet_resp
+               constrain_skeleton_blanchet_0 ; initiator's POV
+               ;constrain_skeleton_blanchet_1
+               temporary
+               wellformed
+
+               ; initiator's a and b are public keys
+               ;   - without this we get odd CEs since the model doesn't prevent matching against unopenable encs
+               ;   - ideally some of this would be enforced by non-orig anyway
+               (in (join blanchet_init blanchet_init_a) PublicKey)
+               (in (join blanchet_init blanchet_init_b) PublicKey)               
+
+               ; Constraints allow for the addition of junk messages to
+               ; allow exact bounds at all times. However, this leads to
+               ; spurious CEs where uniq-orig values can be revealed in the clear
+               ; or encrypted with a key the attacker knows, out of scope of the
+               ; protocol itself
+               ; This isn't strong enough:
+               ;(not (in (join blanchet_init blanchet_init_s)
+               ;         (join Timeslot data)))
+               ; Instead, allow 1--2 strands of each type, and count:
+               (all ([s blanchet_init]) (lone (join receiver s)))
+               (all ([r blanchet_resp]) (lone (join receiver r)))
+               (all ([s blanchet_init]) (lone (join sender s)))
+               (all ([r blanchet_resp]) (lone (join sender r)))               
+               ]
+      #:bounds [(is next linear)]
+      #:scope [(KeyPairs 1 1)
+               (Timeslot 4 8)                               
+               (mesg 22) ; 9 + 3 + 3 + 5
+               
+               (Key 9 9)
+               (akey 6 6)               
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
+               (skey 3 3)
+               
+               (name 3 3)
+               (Attacker 1 1)
+               
+               (text 3 3)
+               
+               (Ciphertext 5 5)               
+               
+               (AttackerStrand 1 1)               
+               (blanchet_init 1 2)
+               (blanchet_resp 1 2)               
+               (strand 2 4)
+               
+               (skeleton_blanchet_0 1 1)
+               (skeleton_blanchet_1 1 1)                           
+               (Int 5)
+               ]
+;      #:expect unsat
+      )
+#;(display blanchet_attack_longer_init)
+
+
+;(set-option! 'verbose 5)
+;(set-option! 'solver 'MiniSatProver)
+;;(set-option! 'skolem_depth 2)
+;;(set-option! 'sb 20000)
+;(set-option! 'logtranslation 1)
+;(set-option! 'coregranularity 1)
+;;(set-option! 'core_minimization 'hybrid)
+;(set-option! 'core_minimization 'rce)
+
+#;(test blanchet_attack_longer_validation
+      #:preds [
+               exec_blanchet_init
+               exec_blanchet_resp
+               ;constrain_skeleton_blanchet_0 
+               ;constrain_skeleton_blanchet_1 
+               temporary
+               wellformed
+
+               ; initiator's a and b are public keys
+               ;   - without this we get odd CEs since the model doesn't prevent matching against unopenable encs
+               ;   - ideally some of this would be enforced by non-orig anyway
+               (in (join blanchet_init blanchet_init_a) PublicKey)
+               (in (join blanchet_init blanchet_init_b) PublicKey)               
+
+               ; Constraints allow for the addition of junk messages to
+               ; allow exact bounds at all times. However, this leads to
+               ; spurious CEs where uniq-orig values can be revealed in the clear
+               ; or encrypted with a key the attacker knows, out of scope of the
+               ; protocol itself
+               ; This isn't strong enough:
+               ;(not (in (join blanchet_init blanchet_init_s)
+               ;         (join Timeslot data)))
+               ; Instead, allow 1--2 strands of each type, and count:
+               (all ([s blanchet_init]) (lone (join receiver s)))
+               (all ([r blanchet_resp]) (lone (join receiver r)))
+               (all ([s blanchet_init]) (lone (join sender s)))
+               (all ([r blanchet_resp]) (lone (join sender r)))               
+               ]
+      #:bounds [(is next linear)]
+      #:scope [(KeyPairs 1 1)
+               (Timeslot 8 8)                               
+               (mesg 22) ; 9 + 3 + 3 + 5
+               
+               (Key 9 9)
+               (akey 6 6)               
+               (PrivateKey 3 3)
+               (PublicKey 3 3)
+               (skey 3 3)
+               
+               (name 3 3)
+               (Attacker 1 1)
+               
+               (text 3 3)
+               
+               (Ciphertext 5 5)               
+               
+               (AttackerStrand 1 1)               
+               (blanchet_init 1 2)
+               (blanchet_resp 1 2)               
+               (strand 2 4)
+               
+               (skeleton_blanchet_0 1 1)
+               (skeleton_blanchet_1 1 1)                           
+               (Int 5)
+               ]
+      #:expect sat
       )
 
 
 
+;(display blanchet_attack_longer_init)
+
 ;(display blanchet_attack_initiator)
-(display blanchet_attack_responder)
+;(display blanchet_attack_responder)

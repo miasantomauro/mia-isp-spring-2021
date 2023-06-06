@@ -389,8 +389,10 @@
                  (reverse msg-var-decls)
                  #`(&&
                     ; these are *all* the send/receives for this strand
+                    ; Messes with exact bounds since 1 send/recv per timeslot
                     (= (+ #,@(map (lambda (pr) (car (syntax->list pr))) msg-var-decls))
                        (+ (join sender rv) (join receiver rv)))
+                    
                     ; trace decl
                     #,@(for/list ([ev (ast-trace-events a-trace)]
                                   [i (build-list (length (ast-trace-events a-trace)) (lambda (x) x))])

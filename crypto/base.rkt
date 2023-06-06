@@ -58,7 +58,8 @@ sig name extends mesg {
   generated_times: set mesg -> Timeslot
 }
 
-sig strand {
+-- every strand will be either a protocol role or the attacker/medium
+abstract sig strand {
   -- the name associated with this strand
   agent: one name
 }
@@ -181,7 +182,7 @@ pred wellformed {
   -- at most one long-term key per (ordered) pair of names
   all a:name, b:name | lone getLTK[a,b]
   -- assume long-term keys are fresh
-  all k: skey | lone (KeyPairs.ltks).k
+  --all k: skey | lone (KeyPairs.ltks).k
 
   -- Attacker's strand
   AttackerStrand.agent = Attacker
