@@ -1,9 +1,4 @@
-#lang forge/core
-(require "../translation.rkt") ; TODO #lang
-
-; Sterling isn't displaying this right
-;(set-option! 'skolem_depth 2)
-;(set-option! 'verbose 5)
+#lang forge/domains/crypto
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Needham-Schroeder example from CSPA
@@ -197,4 +192,5 @@
       #:expect sat
       )
 
-(display NS_attack_responder)
+; Uncomment this to display the run in Sterling
+;(forge:display NS_attack_responder)

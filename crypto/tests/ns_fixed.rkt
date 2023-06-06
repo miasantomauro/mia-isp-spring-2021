@@ -1,12 +1,7 @@
-#lang forge/core
-(require "../macrosketch.rkt") ; TODO #lang
+#lang forge/domains/crypto
 
-; Sterling isn't displaying this right
-;(set-option! 'skolem_depth 2)
-(set-option! 'verbose 2) ; see progress when running test cases
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Needham-Schroeder example from CSPA
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Needham-Schroeder example from CSPA (Fixed version)
 
 (defprotocol ns basic
   (defrole init
@@ -55,7 +50,8 @@
       (! (in (join ns_init ns_init_n2)             
              (join Attacker generated_times Timeslot)))
 
-      ; Stopgap: initiator believes they are a, and responder believes they are b
+      ; Initiator believes they are a, and responder believes they are b
+      ; (Note: cannot add restriction on identity of counterpart, or attack won't be produced!)
       (= (join ns_init ns_init_a) (join ns_init agent))
       (= (join ns_resp ns_resp_b) (join ns_resp agent))
       
@@ -98,11 +94,10 @@
                ] ; omitted akey - note in case of bounds issue
       #:expect sat)
 
-(test ns_fixed_exploit_UNSAT
+(test ns_fixed_exploit_UNSAT_responder_pov
       #:preds [
                exec_ns_init
                exec_ns_resp
-               ;constrain_skeleton_ns_0
                constrain_skeleton_ns_1 ; from responder's POV only
                temporary
                wellformed
@@ -131,6 +126,4 @@
                ]
       #:expect unsat
       )
-
-;(display ns_fixed_exploit_UNSAT)
 
