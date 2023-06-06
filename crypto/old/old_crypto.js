@@ -1,58 +1,54 @@
 const d3 = require('d3')
 // At the moment, if using base d3, the require needs to be the first line. 
 
-// constants for our visualization
-const BASE_X = 150;
-const BASE_Y = 100;
-const TIMESLOT_HEIGHT = 60;
-const AGENT_WIDTH = 270;
-const BOX_HEIGHT = 130;
-const BOX_WIDTH = 200;
-const LINE_HEIGHT = 20;
+// const terms = parseTerms(m.data.tuples());
+// const termSting = parsedTermsToString(temp, subscriptText(m));
 
-// colors
+// constants for our visualization
+const baseX = 150;
+const baseY = 100;
+const timeslotHeight = 80;
+const agentWidth = 300;
+let boxHeight = 130;
+const boxWidth = 200;
+const LINE_HEIGHT = 20;
 const RED = '#E54B4B';
 const BLUE = '#0495C2';
 const GREEN = '#19EB0E';
 const BLACK = '#000000';
 
-// allows for custom fonts
+// add defs to allow for custom fonts!
+// ref: (https://stackoverflow.com/questions/21025876/using-google-fonts-with-d3-js-and-svg)
 d3.select(svg)
     .append('defs')
     .append('style')
     .attr('type', 'text/css')
     .text("@import url('https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700,800');");
 
-/**
- * A function to grab the timeslot data from the forge spec and 
- * store these timeslots in order.
- * @param {*} arr the array to populate with the ordered timeslots
- */
-function orderTimeslots(arr) {
-    // grabbing the data from the forge spec
-    const nextRange = Timeslot.next.tuples().map(x => x.toString());
-    const first = Timeslot.atoms(true).filter(timeslot => !nextRange.includes(timeslot.toString()))[0];
-    // putting the timeslots in order
-    let i;
-    let curr = first;
-    for (i = 0; i < Timeslot.atoms(true).length; i++) {
-        arr.push(curr);
-        curr = curr.next;   
-    }
-}
-
 // data from forge spec
 const strands = strand.atoms(true);
 const messages = Timeslot.atoms(true);
-const agentNames = strands.map(x => x.toString());
-const keyNames = Key.atoms(true).map(x => x.toString());
 const timeslots = [];
 
-// populating the timeslots array
-orderTimeslots(timeslots);
+const nextRange = Timeslot.next.tuples().map(x => x.toString());
+const first = Timeslot.atoms(true).filter(timeslot => !nextRange.includes(timeslot.toString()))[0];
+
+// putting the timeslots in order
+let i;
+let curr = first;
+for (i = 0; i < Timeslot.atoms(true).length; i++) {
+    timeslots.push(curr);
+    curr = curr.next;   
+}
 
 // map from role -> name
 const roles = {}
+agent.tuples().forEach(x => {
+    let role = x.atoms()[0].toString();
+    let name = x.atoms()[1].toString();
+    roles[role] = name;
+});
+
 // map from Timeslot -> Agent -> [Data]
 const learnedInformation = {};
 // map from Timeslot -> Agent -> [Data]
@@ -61,23 +57,15 @@ const generatedInformation = {};
 const visibleInformation = {};
 // map from Datum -> Message
 const dataMessageMap = {};
-// map from public key (Datum) -> owner (Agent[])
+// map from public key (Datum) -> owner (Agent)
 const pubKeyMap = {};
-// map from private key (Datum) -> owner (Agent[])
+// map from private key (Datum) -> owner (Agent)
 const privKeyMap = {};
-// map from Datum -> owners
-const ltksMap = {};
-const ciphertextMap = {};
-const cipherKeyMap = {};
 
-// populating the roles object
-agent.tuples().forEach(x => {
-    let role = x.atoms()[0].toString();
-    let name = x.atoms()[1].toString();
-    roles[role] = name;
-});
+const agentNames = strands.map(x => x.toString());
+const keyNames = Key.atoms(true).map(x => x.toString());
 
-// populating the learnedInformation and generatedInformation objects
+// populating the learnedInformation object
 strands.forEach((strand) => {
 
     let s = strand.toString();
@@ -152,10 +140,7 @@ KeyPairs0.owners.tuples().forEach(x => {
     let atoms = x.atoms();
     let key = atoms[0].toString();
     let owner = atoms[1].toString();
-    if (!privKeyMap[key]) {
-        privKeyMap[key] = [];  
-    } 
-    privKeyMap[key].push(owner);
+    privKeyMap[key] = owner;
 });
 
 // populating pubKeyMap
@@ -163,26 +148,20 @@ KeyPairs0.pairs.tuples().forEach(x => {
     let atoms = x.atoms();
     let private = atoms[0].toString();
     let public = atoms[1].toString();
-    let owners = privKeyMap[private]; 
-    if (!pubKeyMap[public]) {
-        pubKeyMap[public] = [];  
-    } 
-    pubKeyMap[public].push(owners);
+    let owner = privKeyMap[private]; 
+    pubKeyMap[public] = owner;
 });
 
-// populating the ltksMap object
+const ltksMap = {};
 KeyPairs0.ltks.tuples().forEach(x => {
     let s = x.toString();
     let arr = s.split(", ");
     let key = arr[2];
     let val = arr[0] + " " + arr[1];
-    if (!ltksMap[key]) {
-        ltksMap[key] = [];  
-    } 
-    ltksMap[key].push(val);
-});
+    ltksMap[key] = val;
+})
 
-// populating the ciphertextMap object
+const ciphertextMap = {};
 plaintext.tuples().forEach((tuple) => {
     let atoms = tuple.atoms();
     let key = atoms[0].toString();
@@ -192,10 +171,12 @@ plaintext.tuples().forEach((tuple) => {
         ciphertextMap[key] = [];
     }
 
-    ciphertextMap[key].push(val);  
+    ciphertextMap[key].push(val);
+
+    
 });
 
-// populating the cipherKeyMap object
+const cipherKeyMap = {};
 encryptionKey.tuples().forEach((tuple) => {
     let atoms = tuple.atoms();
     let key = atoms[0].toString();
@@ -221,7 +202,7 @@ function getTimeSlotsBefore(timeslot) {
  * @param {Object} agent - an agent prop from the forge spec
  */
 function x(agent) {
-    return BASE_X + (agentNames.indexOf(agent.toString()) * AGENT_WIDTH);
+    return baseX + (agentNames.indexOf(agent.toString()) * agentWidth);
 }
 
 /**
@@ -248,7 +229,7 @@ function y(timeslot) {
         }
     });
  
-    return BASE_Y + (timeslots.indexOf(timeslot) * TIMESLOT_HEIGHT) + (visibleNum * BOX_HEIGHT);
+    return baseY + (timeslots.indexOf(timeslot) * timeslotHeight) + (visibleNum * boxHeight);
 }
 
 /**
@@ -256,7 +237,7 @@ function y(timeslot) {
  * This corresponds with the x coordinate of the message SENDER.
  * @param {Object} m - a message prop from the forge spec
  */
-function messageX1(m) {
+ function messageX1(m) {
     return x(m.sender);
 }
 
@@ -275,7 +256,7 @@ function messageX2(m) {
  * @param {Object} m - a message prop from the forge spec
  */
 function messageY1(m) {
-    return y(m);
+    return y(m); // TODO
 }
 
 /**
@@ -311,7 +292,7 @@ function labelY() {
 
 function parsedTermsToString(parsedTerms, key) {
 
-    let s = (key === "") ? "" : "{ ";
+    let s = "{ "
 
     let i;
     for (i = 0; i < parsedTerms.length; i++) {
@@ -327,30 +308,12 @@ function parsedTermsToString(parsedTerms, key) {
         s += " "
     }
 
-    if (key !== "") {
-        s += `}[${key}]`
-    }
+    s += `}[${key}]`
 
     return s;
 }
 
-function parseKey(itemString, prefix, map) {
-    const owners = map[itemString];
-    let s;
-    
-    if (owners.length === 1) {
-        return {
-            content: `${prefix}(${owners[0]})`
-        };
-    } else {
-        return {
-            content: `${prefix}(SHARED)`,
-            shared: owners
-        };
-        
-    }
-}
-
+// TODO: maybe return the objects for the simpler cases
 function parseTerms(items) {
 
     const newItems = items.map((item) => {
@@ -358,19 +321,16 @@ function parseTerms(items) {
         const itemString = item.toString();
 
         if (pubKeyMap[itemString]) {
-            return parseKey(itemString, "pubK", pubKeyMap);
-        } else if (privKeyMap[itemString]) {
-            return parseKey(itemString, "privK", privKeyMap);
-        } else if (ltksMap[itemString]) {
-            return parseKey(itemString, "ltk", ltksMap);
+            const s = `pubK${pubKeyMap[itemString]}`;
+            return {
+                content: s
+            };
         } else if (itemString.includes("Ciphertext")) {
             const pt = ciphertextMap[itemString];
             const key = cipherKeyMap[itemString]; // in progress see TODO above
-            const parsedKey = parseTerms([key])[0];
-
             return {
                 content: parseTerms(pt),
-                subscript: parsedKey
+                subscript: key
             }
         } else {
             return {
@@ -382,118 +342,17 @@ function parseTerms(items) {
     return newItems;
 }
 
-function flattenParsedTerms(parsedTerms) {
-    let array = [];
+function printParsedTerms(parsedTerms, key, container, x, y) {
+
     let i;
     for (i = 0; i < parsedTerms.length; i++) {
+
         let term = parsedTerms[i];
 
         if (term["subscript"]) {
-            array.push({content: "{"});
-            array = array.concat(flattenParsedTerms(term.content));
-            array.push({content: "}"});
-            
-            if (term.subscript["shared"]) {
-                array.push({
-                    content: term.subscript.content,
-                    shared: term.subscript.shared,
-                    subscript: "subscript"
-                });
-            } else {
-                array.push({
-                    content: term.subscript.content,
-                    subscript: "subscript"
-                });
-            }
 
-        } else if (term["shared"]){
-            array.push({
-                content: term.content,
-                shared: term.shared
-            });
         } else {
-            array.push({content: term.content});
-        } 
-    }
 
-    return array;
-}
-
-function onSharedMouseEnter(x, y, owners) {
-    d3.select(svg).append('text')
-        .attr("x", x)
-        .attr("y", y - 15)
-        .attr("class", "sharedLabel")
-        .text(owners);  
-}
-
-function onSharedMouseLeave() {
-    d3.selectAll(".sharedLabel").remove();
-    // just delete all w the appropriate calss  
-}
-
-// should probably return a width
-function printFlattenedTerms(terms, container, x, y, color, shouldPrint) {
-
-    let i;
-    let w = 0;
-    for (i = 0; i < terms.length; i++) {
-
-        let term = terms[i];
-        let newText;
-
-        if (term["subscript"] && term["shared"]) {
-            newText = container.append('text')
-                .style('font-size', 12)
-                .attr('x', x + w)
-                .attr('y', y)
-                .attr('dx', 5)
-                .attr('dy', 5)
-                .style('fill', color)
-                .text(term.content)
-                .on('mouseenter', () => onSharedMouseEnter(x, y, term.shared))
-                .on('mouseleave', onSharedMouseLeave)
-                .style('cursor', 'pointer');
-            
-            w += newText.node().getComputedTextLength() + 5;
-        } else if (term["subscript"]) {
-            newText = container.append('text')
-                .text(term.content)
-                .style('font-size', 12)
-                .attr('x', x + w)
-                .attr('y', y)
-                .attr('dx', 5)
-                .attr('dy', 5)
-                .style('fill', color);
-            
-            w += newText.node().getComputedTextLength() + 5;
-
-        } else if (term["shared"]) {
-            // TODO: hover
-            newText = container.append('text')
-                .attr('x', x + w)
-                .attr('y', y)
-                .style('font-family', '"Open Sans", sans-serif')
-                .style('fill', color)
-                .text(term.content)
-                .on('mouseenter', () => onSharedMouseEnter(x, y, term.shared))
-                .on('mouseleave', onSharedMouseLeave)
-                .style('cursor', 'pointer');
-            
-            w += newText.node().getComputedTextLength();
-        } else {
-            newText = container.append('text')
-                .attr('x', x + w)
-                .attr('y', y)
-                .style('font-family', '"Open Sans", sans-serif')
-                .style('fill', color)
-                .text(term.content);
-            
-            w += newText.node().getComputedTextLength();
-        }
-
-        if (!shouldPrint) {
-            newText.remove();
         }
 
         /*
@@ -511,8 +370,6 @@ function printFlattenedTerms(terms, container, x, y, color, shouldPrint) {
             .attr('dy', 5);
 */
     }
-
-    return w;
 }
 
 /**
@@ -521,9 +378,45 @@ function printFlattenedTerms(terms, container, x, y, color, shouldPrint) {
  * @returns a string containing the text for the label
  */
 function labelText(m) {
-    const data = m.data.tuples().map(x => x.toString());
-    const parsed = parseTerms(data);
-    return parsedTermsToString(parsed, "");
+
+    const pt = [];
+    // grabbing the plaintext for this message's data
+    m.data.tuples().forEach(tuple => {
+
+        let datum = tuple.atoms()[0].plaintext.toString();
+
+        if (pubKeyMap[datum]) {
+            pt.push(`pubK${pubKeyMap[datum]}`);
+        } else if (privKeyMap[datum]) {
+            // TODO: would this ever happen?
+            pt.push(`privK${privKeyMap[datum]}`);
+        } else {
+            // funky
+            pt.push(datum ? datum : tuple.toString());
+        }
+    });
+    // TODO: more formatting (commas) ?
+    const ptString = pt;
+    return `{${ptString}}`;
+}
+
+/**
+ * a function to construct the subscript text of a label
+ * @param {*} m - a message prop from the forge spec 
+ * @returns a string containing the text for the subscript
+ */
+function subscriptText(m) {
+    let k = m.data.encryptionKey.toString();
+    let s;
+    if (ltksMap[k]) {
+        s = `ltk(${ltksMap[k]})`;
+    } else if (pubKeyMap[k]) {
+        s = `pubK${pubKeyMap[k]}`;
+    } else {
+        s = `${k}?`;
+    }
+    
+    return s;
 }
 
 /**
@@ -539,11 +432,6 @@ function centerText() {
     return x - (textWidth / 2);
 }
 
-/**
- * a function to toggle the visibility of boxes upon mouseclicks
- * @param {*} mouseevent - not used
- * @param {*} timeslot - the timeslot to toggle visible information for
- */
 function onMouseClick(mouseevent, timeslot) {
     const ts = timeslot.toString();
 
@@ -556,22 +444,43 @@ function onMouseClick(mouseevent, timeslot) {
     render();
 }
 
-/**
- * a function to seperate "complex" data (data using subscripts) from "simple" data
- * @param {*} textArray 
- * @returns 
- */
+// check if its an encripted message, public key, or private key
+function replaceDatum(d) {
+    if (dataMessageMap[d]) {
+        let m = dataMessageMap[d];
+        return {
+            content: labelText(m),
+            subscript: subscriptText(m)
+        };
+    } else if (pubKeyMap[d]) {
+        return {
+            content: `pubK${pubKeyMap[d]}`
+        };
+    } else if (privKeyMap[d]) {
+        // TODO: would this ever happen?
+        return {
+            content: `privK${privKeyMap[d]}`
+        };
+    } else {
+        return {
+            content: d
+        };
+    }
+}
+
 function filterComplexData(textArray) {
 
     const simple = [];
     const complex = [];
 
-    parseTerms(textArray).forEach((term) => {
+    textArray.forEach((d) => {
 
-        if ('subscript' in term) {
-            complex.push(term);
+        let replaced = replaceDatum(d);
+
+        if ('subscript' in replaced) {
+            complex.push(replaced);
         } else {
-            simple.push(term.content);
+            simple.push(replaced.content);
         }
 
     });
@@ -579,13 +488,7 @@ function filterComplexData(textArray) {
     return {simple, complex};
 }
 
-/**
- * a helper function for wrapText which finds the last space before the given index in the 
- * given string
- * @param {*} string 
- * @param {*} index 
- * @returns 
- */
+//// helper function to find the last space before the given index in the given string
 function spaceBefore(string, index) {
 
     let workingString = string;
@@ -606,16 +509,6 @@ function spaceBefore(string, index) {
     return spaceIndex;
 }
 
-/**
- * a function to display text over multiple lines
- * @param {*} container 
- * @param {*} text 
- * @param {*} width 
- * @param {*} x 
- * @param {*} y 
- * @param {*} color 
- * @returns the computed height of the resulting text
- */
 function wrapText(container, text, width, x, y, color) {
 
     if (text === "") {
@@ -662,15 +555,6 @@ function wrapText(container, text, width, x, y, color) {
   
 }
 
-/**
- * a function to render the information that appears inside the toggleable boxes
- * @param {*} container 
- * @param {*} info 
- * @param {*} x 
- * @param {*} y 
- * @param {*} color 
- * @returns 
- */
 function displayInfo(container, info, x, y, color) {
 
     let h = 0;
@@ -678,25 +562,34 @@ function displayInfo(container, info, x, y, color) {
     const {simple, complex} = filterComplexData(info);
     const s = simple.join(" ");
 
-    // render simple data over multiple lines
-    h += wrapText(container, s, BOX_WIDTH - 25, x, y, color);
+    h += wrapText(container, s, boxWidth - 25, x, y, color);
 
-    // render complex data one per line
     let i;
     for (i = 0; i < complex.length; i++) {
-        const flattened = flattenParsedTerms([complex[i]]);
-        const w = printFlattenedTerms(flattened, container, x, y + h, color, true);
+
+        let t = complex[i].content;
+
+        let subscript = complex[i].subscript;
+
+        const temp = container.append('text')
+            .attr('x', x)
+            .attr('y', y + h)
+            .style('font-family', '"Open Sans", sans-serif')
+            .style('fill', color)
+            .text(t);
+
+        temp.append('tspan')
+            .text(subscript)
+            .style('font-size', 12)
+            .attr('dx', 5)
+            .attr('dy', 5);
 
         h+=LINE_HEIGHT;
-
     }
 
     return h;
 }
 
-/**
- * the main render function of this visualization
- */
 function render() {
     // clear the svg
     d3.select(svg).selectAll('*').remove();
@@ -706,9 +599,9 @@ function render() {
         .selectAll('timeslot') // giving these shapes a name
         .data(timeslots)
         .join('line')
-        .attr('x1', BASE_X)
+        .attr('x1', baseX)
         .attr('y1', y)
-        .attr('x2', BASE_X + ((strands.length - 1) * AGENT_WIDTH))
+        .attr('x2', baseX + ((strands.length - 1) * agentWidth))
         .attr('y2', y)
         .attr('stroke', BLACK)
         .attr('fill', 'white')
@@ -720,7 +613,7 @@ function render() {
         .data(timeslots)
         .join('text')
         .on('click', onMouseClick)
-        .attr('x', BASE_X - 90)
+        .attr('x', baseX - 90)
         .attr('y', y)
         .style('font-family', '"Open Sans", sans-serif')
         .style('cursor', 'pointer')
@@ -734,7 +627,7 @@ function render() {
         .attr('stroke', BLUE)
         .style('stroke-width', 10)
         .attr('x1', x)
-        .attr('y1', BASE_Y) 
+        .attr('y1', baseY) 
         .attr('x2', x)
         .attr('y2', y(timeslots[timeslots.length - 1]));
 
@@ -744,19 +637,23 @@ function render() {
         .data(strands)
         .join('text')
         .attr('x', x)
-        .attr('y', BASE_Y - 60)
+        .attr('y', baseY - 40)
         .style('font-family', '"Open Sans", sans-serif')
-        .text(a => a.toString());
+        .text((a) => {
+            return `${a.toString()} (${roles[a.toString()]})`;
+        });
 
+        /*
+    // label the strands with their roles
     const aLabel2 = d3.select(svg)
         .selectAll('agentLabel')
         .data(strands)
         .join('text')
         .attr('x', x)
-        .attr('y', BASE_Y - 40)
+        .attr('y', baseY - 60)
         .style('font-family', '"Open Sans", sans-serif')
-        .text((a) => `(agent: ${roles[a.toString()]})`);
-
+        .text((a) => roles[a.toString()]);
+*/
     // bind messages to m
     const m = d3.select(svg)
         .selectAll('message')
@@ -799,23 +696,23 @@ function render() {
         .attr('x2', messageX2)
         .attr('y2', arrowBottomY2);
 
-    // for each message...
+    // adding labels
+    const label = g.append('text')
+        .attr('x', labelX) // this is temporary
+        .attr('y', labelY)
+        .style('font-family', '"Open Sans", sans-serif')
+        .style('fill', BLACK)
+        .text(labelText);
 
-    messages.forEach(m => {
-        let labelX = (x(m.sender) + x(m.receiver)) / 2;
-        let labelY = y(m) - 20;
+    // subscript for hovering label
+    label.append('tspan')
+        .text(subscriptText)
+        .style('font-size', 12)
+        .attr('dx', 5)
+        .attr('dy', 5);
 
-        const data = m.data.tuples().map(x => x.toString());
-        const parsed = parseTerms(data);
-        const flattened = flattenParsedTerms(parsed);
-
-        const w = printFlattenedTerms(flattened, g, labelX, labelY, BLACK, false);
-
-        const newLabelX = labelX - Math.round((w / 2)); // rounding to make less blurry?
-
-        printFlattenedTerms(flattened, g, newLabelX, labelY, BLACK, true);
-
-    });
+    // center the text over the arrow
+    label.attr('x', centerText);
 
     timeslots.forEach((timeslot) => {
         let ts = timeslot.toString();
@@ -823,36 +720,20 @@ function render() {
             let a = agent.toString();
             if (visibleInformation[ts][a]) {
 
-                const boxX = x(agent) - (BOX_WIDTH / 2.0);
+                const boxX = x(agent) - (boxWidth / 2.0);
                 const boxY = y(timeslot) + 30;
 
                 // create a group and give it an id specific to this timeslot-agent pair
-                const id = ts + a;
                 const g = d3.select(svg)
                     .append('g')
-                    .attr('id', id)
-                    .attr('x', boxX)
-                    .attr('y', boxY)
-                    .attr('width', BOX_WIDTH)
-                    .attr('height', BOX_HEIGHT);
-                /*
-                const g = d3.select(svg)
-                    .append('svg')
-                    .attr('id', id)
-                    .attr('x', boxX)
-                    .attr('y', boxY)
-                    .attr('width', BOX_WIDTH)
-                    .attr('height', BOX_HEIGHT)
-                    .attr('viewBox', `${boxX} ${boxY} ${BOX_WIDTH} ${BOX_HEIGHT}`)
-                    .style('overflow', 'scroll')
-                    .style('display', 'block');*/
+                    .attr('id', ts + a);
             
                 // append the rect
                 const r = g.append('rect')
                     .attr('x', boxX)
                     .attr('y', boxY)
-                    .attr('width', BOX_WIDTH)
-                    .attr('height', BOX_HEIGHT)
+                    .attr('width', boxWidth)
+                    .attr('height', boxHeight)
                     .attr('rx', 6)
                     .attr('ry', 6)
                     .style('fill', 'white')

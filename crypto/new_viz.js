@@ -1,3 +1,5 @@
+const d3 = require('d3')
+// At the moment, if using base d3, the require needs to be the first line. 
 
 // constants for our visualization
 const BASE_X = 150;

@@ -1,28 +1,50 @@
 #lang forge/core
 
-; Module to accept CPSA protocol and skeleton definitions and enhance a
-; base crypto specification with protocol/skeleton-specific sigs and constraints.
+; Module to translate CPSA protocol and skeleton definitions into a system model
+; in Forge, that can be composed the the crypto domain model in `base.frg`. 
 ;   Tim and Abby (Spring 2021)
+
+; For reference on CPSA and its protocol language, see:
+;https://hackage.haskell.org/package/cpsa-3.3.2/src/doc/cpsamanual.pdf
+; At the moment, we have support for the "basic" algebra only.
 
 ; DESIGN CHOICES:
 ;   - non-orig and uniq-orig enforce both non/unique origination and non/unique generation.
 ;   - no ordering on message contents (could do with sequencing/adding column)
 ;   - strands can match within encrypted terms they cannot decrypt (unrealistic, should fix)
 
+; DEV NOTES:
+;   - recall that forge/core now uses &&, ||, and ! to denote FORMULA "and", "or", 
+;     and "not" respectively. Do not attempt to use (e.g.) "and" to construct
+;     a conjunction, as "and" is Racket's boolean operator---and Racket is truthy, so
+;     (and <fmla> <fmla>) will produce #t.
 
-;https://hackage.haskell.org/package/cpsa-3.3.2/src/doc/cpsamanual.pdf
-; At the moment, we have prototype support for the "basic" algebra
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Dependencies 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(require syntax/parse syntax/parse/define)
-(require (for-syntax (only-in racket take last flatten drop-right first second third filter-map
+; Phase 1 (syntax) dependencies -- used within macros and for-syntax
+(require (for-syntax racket/base
+                     (only-in racket take last flatten drop-right first second third filter-map
                               string-join
                               or/c define/contract listof [-> -->]) 
                      racket/match
                      racket/syntax))
 
+; Phase 0 (normal execution) dependendies
+(require syntax/parse syntax/parse/define)
 (require "base.frg") ; the base crypto model
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Exports 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (provide (all-from-out "base.frg")) ; let caller refer to base preds
 (provide all-defined-out)           ; let caller refer to constructed preds
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Defining new syntax 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; First, define some syntax classes to ease parsing and improve errors.
 ; Syntax classes can expose custom attributes, which make them easier to process.
@@ -531,17 +553,17 @@
           (for/list ([ast asts])
             (for/list ([term (if ast (accessor ast) '())]) ; if no such decls are present, do nothing
               (printf "Processing orig declaration: kind=~a~n" (syntax->datum kind))
-              #`(&&
+              #`  (&&
                  ; Additional meaning to reflect CPSA for uniq- and non-orig:
                  ; this can't be a a key *prepopulated* for the attacker, since
                  ; they are uniquely and freshly chosen
                  #,(if (or (equal? (syntax->datum kind) 'no) ; non-
                            (equal? (syntax->datum kind) 'one)) ; uniq-
-                       #`(not
+                       #`(!
                           (in
                            #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter)
                            (baseKnown Attacker)))
-                       #'true)
+                       #'forge:true)
                  
                  ; actual origination constraints
                  (#,kind ([aStrand strand])
@@ -555,7 +577,7 @@
                              (if (is-text-or-key-variable? term vars)
                                  #`(generates aStrand
                                               #,(datum-ast->expr this-strand-or-skeleton pname strand-role-or-skeleton-idx term #:id-converter id-converter))
-                                 #'false))))))))])
+                                 #'forge:false))))))))])
     result))
 
 
@@ -597,7 +619,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Notes:
-; Basic algebra has sorts (Table 10.3):
+; Basic algebra has sorts (Table 10.3 in CPSA manual):
 ;   text|data|name|tag|skey|akey|mesg
 ;     skey and akey are symmetric and asymmetric keys
 ;     data vs text: page 21 says they are interchangeable, but disjoint
@@ -606,14 +628,21 @@
 ;        confused for each other."
 ;     mesg: sort of messages, which can stand in for any value 
 
-;(set-option! 'verbose 5)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Debugging and notes; adjust these as needed
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;(set-option! 'verbose 1)
+(set-option! 'verbose 5)
+(set-option! 'solver 'Glucose)
 ;(set-option! 'solver 'MiniSatProver)
 ;(set-option! 'logtranslation 2)
 ;(set-option! 'coregranularity 2)
 ;(set-option! 'core_minimization 'rce)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; TODO: need forge/core to allow constructing scope at runtime while invoking run
-; until that works, cannot do easy inference of bounds. Leaving this here.
+; until that works, cannot do easy inference of bounds. Leaving this here as use-case.
 ;(define-syntax (run-crypto stx)
 ;  (syntax-case stx ()
 ;    [(_ name (preds ...) #:n-strands n-strands #:scopes )
