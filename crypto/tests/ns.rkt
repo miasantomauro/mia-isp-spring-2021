@@ -1,5 +1,5 @@
 #lang forge/core
-(require "../macrosketch.rkt") ; TODO #lang
+(require "../translation.rkt") ; TODO #lang
 
 ; Sterling isn't displaying this right
 ;(set-option! 'skolem_depth 2)
@@ -21,15 +21,16 @@
            (recv (enc n2 (pubk b))))))
 
 ; Similarly to Blanchet, the problem is from the responder's POV:
-; there is a confusion of identity. Both (responder vals for ) a and b's
+; there is a confusion of identity. Both (responder vals for) a and b's
 ; keys are secret: neither is the MitM. but the responder believes that
 ; they are b, and the initiator has a different name for b; perhaps
-; someone compromised.
+; someone's identity is compromised.
 
 ; Note, vitally, this quote from the CPSA manual:
 ; "Below this is a list of trees, each of which represents the analysis
 ;  of one of the input defskeletons; in the case of our example, there are two trees."
 ; Unfortunately, our tool doesn't break the analysis out separately per skeleton.
+; Thus, we need to invoke a single skeleton individually in each query
 
 ; SKELETON 0
 (defskeleton ns
@@ -51,19 +52,13 @@
 
 
 
-; Confirm
+; Debugging: Confirm
 ;(hash-keys (forge:State-sigs forge:curr-state))
 ;(hash-keys (forge:State-relations forge:curr-state))
 ;(hash-keys (forge:State-pred-map forge:curr-state))
 ;(relation-typelist ns_init_a)
 ;(relation-typelist skeleton_ns_0_n1)
 
-
-;(set-option! 'verbose 1)
-;(set-option! 'solver 'MiniSatProver)
-;(set-option! 'logtranslation 2)
-;(set-option! 'coregranularity 2)
-;(set-option! 'core_minimization 'rce)
 
 (pred attack_exists
       (in (+ (join ns_init ns_init_n1)
@@ -121,8 +116,8 @@
                (skey 0 0)
                (akey 6 6)
                (strand 3 3)
-               (skeleton_ns_0 1 1)
-               ;(skeleton_ns_1 1 1)
+               (skeleton_ns_0 1)
+               (skeleton_ns_1 1)
                ] 
       #:expect sat
       )
@@ -132,12 +127,10 @@
                exec_ns_init
                exec_ns_resp
                constrain_skeleton_ns_0 ; INITIATOR POV
-               ;constrain_skeleton_ns_1
                temporary
                wellformed
 
                attack_exists
-               ;(not attack_exists)
                success
                attack_frame
                ]
@@ -165,18 +158,17 @@
       #:expect unsat
       )
 
-;(test NS_attack_responder
-(run NS_attack_responder
+; Change the test to a run in order to view the result
+(test NS_attack_responder
+;(run NS_attack_responder
       #:preds [
                exec_ns_init
                exec_ns_resp
-               ;constrain_skeleton_ns_0
                constrain_skeleton_ns_1 ; RESPONDER POV
                temporary
                wellformed
 
                attack_exists
-               ;(not attack_exists)
                success
                attack_frame
                ]
@@ -201,12 +193,8 @@
                (skeleton_ns_0 1 1)
                (skeleton_ns_1 1 1)
                ] 
-      ;#:expect sat
+      ; Comment this expectation out if converting this test to a run
+      #:expect sat
       )
 
-
-
 (display NS_attack_responder)
-; This will auto-highlight if settings are correct
-; (tree:get-value (forge:Run-result NS_SAT))
-;(is-sat? NS_SAT)

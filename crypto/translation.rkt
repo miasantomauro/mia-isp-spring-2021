@@ -632,8 +632,7 @@
 ; Debugging and notes; adjust these as needed
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;(set-option! 'verbose 1)
-(set-option! 'verbose 5)
+(set-option! 'verbose 1)
 (set-option! 'solver 'Glucose)
 ;(set-option! 'solver 'MiniSatProver)
 ;(set-option! 'logtranslation 2)
