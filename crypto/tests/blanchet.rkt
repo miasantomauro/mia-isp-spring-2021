@@ -1,5 +1,4 @@
-#lang forge/core
-(require "../macrosketch.rkt")
+#lang forge/domains/crypto
 
 ;(herald "Blanchet's Simple Example Protocol"
 ;  (comment "There is a flaw in this protocol by design"))

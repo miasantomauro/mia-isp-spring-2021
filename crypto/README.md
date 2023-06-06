@@ -7,10 +7,9 @@
 - ns fixed test
 - reflect test
   - TypeError: r is undefined (viz)
+    - this is a _Forge_ bug: Skolem relations are being sent with unary type, even if skolem depth > 1. 
 - blanchet test
-- blanchet corrected (?) test
-- or (?) test
-- multi-data (?) test
+- blanchet corrected test
 - documentation in this file
 - document predicates (temporary? wellformed? can we rename the former to something meaningful?)
 - fully migrate tests and docs to Forge repo
