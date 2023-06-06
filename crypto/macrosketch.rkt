@@ -20,8 +20,8 @@
                      racket/match
                      racket/syntax))
 
-(require "base.rkt") ; the base crypto model
-(provide (all-from-out "base.rkt")) ; let caller refer to base preds
+(require "base.frg") ; the base crypto model
+(provide (all-from-out "base.frg")) ; let caller refer to base preds
 (provide all-defined-out)           ; let caller refer to constructed preds
 
 ; First, define some syntax classes to ease parsing and improve errors.
