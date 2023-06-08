@@ -13,7 +13,9 @@
 - documentation in this file
 - document predicates (temporary? wellformed? can we rename the former to something meaningful?)
 - fully migrate tests and docs to Forge repo
-
+- Need better built-ins (right now there are many query helpers the user has to write)
+  - this goes to the educational focus! simplify the support, perhaps...
+- Need better error if someone uses "not" instead of "!" in forge/core
 
 ## ...
 

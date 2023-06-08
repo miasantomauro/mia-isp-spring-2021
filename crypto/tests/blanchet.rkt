@@ -18,23 +18,10 @@
     (uniq-orig d))
   (comment "Blanchet's protocol"))
 
-;(defskeleton blanchet
-;  (vars (a b akey) (s skey) (d data))
-;  (defstrand init 2 (a a) (b b) (s s) (d d))
-;  (non-orig (invk b))
-;  (comment "Analyze from the initiator's perspective"))
-
-;(defskeleton blanchet
-;  (vars (a b akey) (s skey) (d data))
-;  (defstrand resp 2 (a a) (b b) (s s) (d d))
-;  (non-orig (invk a) (invk b))
-;  (comment "Analyze from the responder's perspective"))
-
 ; Note well:
 ; The scenario the manual describes shows the *responder*'s value
-; being compromised, but not the initiator's. Right now, our model
-; will create a constraint for both listeners (conjuctively), yielding
-; a spurious unsat result unless the initiator's deflistener is removed.
+; being compromised, but not the initiator's. Our model will create
+; predicates for each skeleton, so be certain to invoke only ONE.
 
 ;  To do so, don't remove the skeleton, just prevent its constraint from taking effect.
 (defskeleton blanchet
@@ -52,15 +39,11 @@
   (comment "From the responders's perspective, is the secret leaked?"))
 
 ; Bounds can be quite troublesome. Count carefully.
-;
-
 
 (test blanchet_SAT
       #:preds [
                exec_blanchet_init
                exec_blanchet_resp
-               ;constrain_skeleton_blanchet_0
-               ;constrain_skeleton_blanchet_1
                temporary
                wellformed
 
@@ -101,14 +84,12 @@
       #:expect sat
       )
 
-
-
+; Initiator's perspective doesn't see an attack.
 (test blanchet_attack_initiator
       #:preds [
                exec_blanchet_init
                exec_blanchet_resp
                constrain_skeleton_blanchet_0 ; initiator's POV
-               ;constrain_skeleton_blanchet_1
                temporary
                wellformed
 
@@ -149,11 +130,11 @@
       #:expect unsat
       )
 
+; Responder's perspective does see an attack.
 (run blanchet_attack_responder
       #:preds [
                exec_blanchet_init
                exec_blanchet_resp
-               ; constrain_skeleton_blanchet_0
                constrain_skeleton_blanchet_1 ; responder's POV
                temporary
                wellformed
@@ -166,16 +147,18 @@
                
                ; FOR DISPLAY ONLY: dont send a LTK as d or s
                ; KeyPairs.ltks: name x name x skey, hence the join pattern
-              ; (not (in (join blanchet_init blanchet_init_d)
-              ;          (join name (join name (join KeyPairs ltks)))))
-              ; (not (in (join blanchet_init blanchet_init_s)
-              ;          (join name (join name (join KeyPairs ltks)))))
+              (! (in (join blanchet_init blanchet_init_d)
+                       (join name (join name (join KeyPairs ltks)))))
+              (! (in (join blanchet_init blanchet_init_s)
+                       (join name (join name (join KeyPairs ltks)))))
                
                ; to get an example for SHARED, remove the above LTK restriction
                ; and comment out the " assume long-term keys are fresh" in base.rkt
                ; plus:
                
-               (
+               ;(
+;; TODO
+
                ]
       #:bounds [(is next linear)]
       #:scope [(KeyPairs 1 1)
